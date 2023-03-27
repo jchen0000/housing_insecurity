@@ -1,0 +1,59 @@
+---
+title: "draft_code_jiaqi"
+output: pdf_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r}
+###### XGBoost Model with balanced dataset
+balanced_final_matrix = model.matrix(hi_flag ~., data_rose)[ , -1]
+
+set.seed(2)
+rowTrain2 <- createDataPartition(y = data_rose$hi_flag,
+                                p = 0.7,
+                                list = FALSE)
+
+# training data
+balanced_train_data <- balanced_final_matrix[rowTrain2,]
+balanced_train_labels <- data_rose$hi_flag[rowTrain2]
+
+# testing data
+balanced_test_data <- balanced_final_matrix[-rowTrain,]
+balanced_test_labels <- data_rose$hi_flag[-rowTrain]
+
+# Convert the cleaned dataframe to a matrix
+balanced_dtrain <- xgb.DMatrix(data = balanced_train_data, label = balanced_train_labels)
+balanced_dtest <- xgb.DMatrix(data = balanced_test_data, label = balanced_test_labels)
+
+# get the number of negative & positive cases in our data
+balanced_negative_cases <- sum(balanced_train_labels == 0) ## 0 = FALSE
+balanced_postive_cases <- sum(balanced_train_labels == 1) ##1 = TRUE
+
+# train a model using our training data
+balanced_model_tuned2 <- xgboost(data = balanced_dtrain,           
+                 max.depth = 3, 
+                 nround = 10, 
+                 early_stopping_rounds = 3, 
+                 objective = "binary:logistic",
+                 scale_pos_weight = balanced_negative_cases/balanced_postive_cases,
+                 gamma = 1) 
+
+# generate predictions for our held-out testing data
+balanced_pred3 <- predict(balanced_model_tuned2, balanced_dtest)
+
+# get & print the classification error
+balanced_err3 <- mean(as.numeric(balanced_pred3 > 0.5) != balanced_test_labels)
+print(paste("test-error=", balanced_err3))
+
+### test-error = 0.235276650499852
+
+library(pROC)
+# ROC
+balanced_roc_xgboost3 <- roc(balanced_test_labels, balanced_pred3) ## 0.8507
+
+```
+
+
+

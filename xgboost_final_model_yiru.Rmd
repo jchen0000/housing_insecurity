@@ -1,0 +1,275 @@
+---
+title: "xgboost final model"
+author: "Jiaqi Chen"
+date: "2022-10-05"
+output: pdf_document
+---
+
+```{r, warning=FALSE}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+library(caret)
+library(ranger)
+library(pROC)
+library(xgboost)
+library(keras)
+library(tfruns)
+library(mice)
+```
+
+# Final Balanced Data Set
+```{r}
+# load("balanced_data.Rdata") ## for balanced train data: data_rose
+load("final.Rdata") ## for original full dataset: final 
+## training data
+train = final[rowTrain,] ##for original data
+x = train[,-1]  
+y = train$hi_flag  
+
+## testing data
+x2 = final[-rowTrain,-1]   
+y2 = final$hi_flag[-rowTrain]
+test = cbind(x2,hi_flag=y2)
+
+```
+
+# XGBoost
+```{r}
+train2 = train %>% 
+  mutate_if(is.factor,as.numeric) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+  
+
+final2 = final
+final2 = final2 %>% 
+  mutate_if(is.factor,as.numeric) 
+
+library(mlr)
+
+trainTask <- makeClassifTask(data = train2, target = "hi_flag", positive = 1)
+testTask <- makeClassifTask(data = final2[-rowTrain,], target = "hi_flag")
+
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 500
+  )
+)
+
+xgb_model <- mlr::train(xgb_learner, task = trainTask)
+```
+
+
+```{r}
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 50, upper = 300),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 10),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .01, upper = .4),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+getParamSet("classif.xgboost")
+
+control <- makeTuneControlRandom(maxit = 1)
+
+set.seed(256)
+resample_desc <- makeResampleDesc("CV", iters = 4)
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+
+tuned_params$x
+```
+
+$nrounds
+[1] 168
+
+$max_depth
+[1] 1
+
+$eta
+[1] 0.3986912
+
+$lambda
+[1] 0.2052652
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model <- mlr::train(xgb_tuned_learner, trainTask)
+
+max(xgb_model[["learner.model"]][["evaluation_log"]][["train_auc"]])
+#0.8002
+
+pred3 <- predict(xgb_model, testTask, type = "prob")
+
+# pred3$data$response
+
+roc_xgboost3 <- roc(pred3$data$truth, pred3$data$prob.1) ## 0.7341
+roc_xgboost3 #0.7341
+```
+
+# Result submission
+
+```{r}
+# holdout data manipulation
+all_feature = colnames(select(final,-hi_flag,-metro))
+cat_idx2 = c(cat_idx,"metro")
+num_idx = setdiff(all_feature,cat_idx2)
+
+## feature selection
+holdout = read.csv("../2022_Competition_Holdout.csv") %>% 
+  janitor::clean_names()
+holdout[holdout=='null'] = NA
+holdout_id = holdout$id
+
+holdout = holdout %>% 
+  select_at(all_feature) %>%
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) ) %>% 
+  mutate_at(cat_idx2, as.factor) %>% 
+  mutate_at(num_idx,as.numeric)
+### view the NA condition
+h.na = sapply(holdout,function(x) sum(is.na(x)))
+h.na[which(h.na>0)]
+```
+
+## Ver2: XGBoost
+```{r}
+train3 = final %>% 
+  mutate_if(is.factor,as.numeric) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+  
+
+final3 = holdout %>% 
+  mutate_if(is.factor,as.numeric) 
+
+library(mlr)
+
+trainTask2 <- makeClassifTask(data = train3, target = "hi_flag", positive = 1)
+
+label = sample(0:1, size = 12220, replace = T)
+final3$hi_flag = label
+testTask2 <- makeClassifTask(data = final3, target = "hi_flag", positive = 1)
+```
+
+## parameter tuning
+
+```{r}
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 500
+  )
+)
+
+xgb_model <- train(xgb_learner, task = trainTask)
+```
+
+```{r}
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 50, upper = 300),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 10),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .01, upper = .4),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+getParamSet("classif.xgboost")
+
+control <- makeTuneControlRandom(maxit = 1)
+
+set.seed(256)
+resample_desc <- makeResampleDesc("CV", iters = 4)
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+tuned_params$x
+```
+
+$nrounds
+[1] 168
+
+$max_depth
+[1] 1
+
+$eta
+[1] 0.3986912
+
+$lambda
+[1] 0.2052652
+
+
+## New Model for Train.csv
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model2 <- mlr::train(xgb_tuned_learner, trainTask2)
+
+pred4 <- predict(xgb_model2, testTask2, type = "prob")
+
+prob = pred4$data$prob.1
+
+```
+
+```{r}
+output = cbind(ID = holdout_id, 
+               SCORE = prob,  #or pred4$data$response (a column of probability)
+               RANK = rank(-prob,ties.method = "last"))
+write.csv(output,"2022CaseCompetition_Yiru_Gong_20221006.csv",row.names = F)
+```
+
+
+## for fairness analysis
+
+```{r}
+pred = predict(xgb_model2, trainTask2, type = "prob")
+res = cbind(train3,prob = pred$data$prob.1, pred = pred$data$response)
+SR = res %>% 
+  group_by(cms_race_cd,sex_cd) %>% 
+  summarise(
+    tpr = 
+  )
+```
+
+

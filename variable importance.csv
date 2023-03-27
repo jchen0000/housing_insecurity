@@ -1,0 +1,235 @@
+feature_desciption,var,value,data_type
+Homeowner Status,cons_homstat,0.013683121,string
+Code indicating the original reason for entry into Medicare,cms_orig_reas_entitle_cd,0.009323001,string
+Short Term Loan Index,cons_stlindex,0.009194641,integer
+Managing Illness or Condition - Index,cons_hxmioc,0.007368608,integer
+allowed cost per month for overall claims related to physician office in the past one year,total_physician_office_allowed_pmpm_cost,0.004974712,double
+Binary indicator that a member is receiving a subsidy from CMS,cms_low_income_ind,0.004630446,integer
+"Member age {calculated using est_bday, relative to score/index date}",est_age,0.003757357,integer
+visits per month for overall claims related to physician office in the past one year,total_physician_office_visit_ct_pmpm,0.00333915,double
+count per month of member interactions via webstatement with a lag of _0 from the score date in the past one year,cnt_cp_webstatement_0,0.00332732,integer
+Managing the Business of Health,cons_hxmboh,0.003264027,integer
+Clinical Care - Discharges for Ambulatory Care Sensitive Conditions per 1K Medicare Enrollees,rwjf_preventable_ip_rate,0.003174706,double
+count per month of prescriptions related to Tier 1 drugs in the past one year,rx_tier_1_pmpm_ct,0.00308302,float
+cost per month of prescriptions related to mail drugs in the past one year,rx_mail_pmpm_cost,0.002951702,float
+Health Outcomes - HIV prevalence,rwjf_hiv_rate,0.002938689,float
+Total number of occupied housing units,atlas_totalocchu,0.00291207,double
+Physical Environment - Average daily density of fine particulate matter in micrograms per cubic meter (PM2.5),rwjf_air_pollute_density,0.002774837,float
+days since last claim for non-behavioral health claims related to physician office in the past one year,med_physician_office_ds_clm,0.002604478,integer
+Percent of population 65 or older,atlas_age65andolderpct2010,0.002573127,double
+count per month of prescriptions related to CHEMOTHERAPY - PARP INHIBITORS drugs in the past one year {Based on Humana drug classification},rx_hum_24_pmpm_ct,0.002531129,float
+Adult Diabetes Rate,atlas_pct_diabetes_adults13,0.00234125,double
+Orchard farms,atlas_orchard_farms12,0.002277365,double
+allowed cost per month for overall claims in the past one year,total_allowed_pmpm_cost,0.002173849,double
+count per month of member interactions via vat in the past one year,cnt_cp_vat_pmpm_ct,0.00216675,float
+Code indicating a member's race,cms_race_cd,0.002085712,string
+cost per month for prescriptions in the past one year,rx_overall_pmpm_cost,0.002071515,float
+allowed cost per month for overall claims related to outpatient facilities in the past one year,total_outpatient_allowed_pmpm_cost,0.002054953,double
+Population Size,atlas_totalpopest2016,0.002045488,double
+days since last claim for non-behavioral health claims related to outpatient facilities in the past one year,med_outpatient_ds_clm,0.001869806,integer
+cost per month of prescriptions related to nonspecialty drugs in the past one year,rx_nonspecialty_pmpm_cost,0.001817752,float
+count per month of member interactions via webstatement with a lag of _3 from the score date in the past one year,cnt_cp_webstatement_3,0.001753867,integer
+cost per month of prescriptions related to maintenance drugs in the past one year,rx_maint_pmpm_cost,0.001739671,float
+claims per month related to diseases of the skin and subcutaneous tissue : radiation-related disorders of the skin and subcutaneous tissue in the past one year {based on CMS diagnosis code level2},cmsd2_skn_radiation_pmpm_ct,0.001718376,float
+days since last claim for overall claims related to physician office in the past one year,total_physician_office_ds_clm,0.001708911,integer
+days since last claim for overall claims related to outpatient facilities in the past one year,total_outpatient_ds_clm,0.001705362,integer
+claims per month related to diseases of the musculoskeletal system and connective tissue in the past one year {based on CMS diagnosis code level1},cmsd1_mus_pmpm_ct,0.001702996,float
+allowed cost per month for non-behavioral health claims in the past one year,total_med_allowed_pmpm_cost,0.001702405,double
+cost per month of prescriptions related to non maintenance drugs in the past one year,rx_nonmaint_pmpm_cost,0.001700038,float
+days since last prescription in the past one year,rx_days_since_last_script,0.001643844,integer
+count per month of prescriptions related to CARDIOLOGY - HEART FAILURE drugs in the past one year {Based on Humana drug classification},rx_hum_16_pmpm_ct,0.001611901,float
+count per month of prescriptions related to GASTROINTESTINAL DISEASE - CONSTIPATION drugs in the past one year {Based on Humana drug classification},rx_hum_40_pmpm_ct,0.001604212,float
+count per month of member interactions via print in the past one year,cnt_cp_print_pmpm_ct,0.001577593,float
+cost per month of prescriptions related to non mail drugs in the past one year,rx_nonmail_pmpm_cost,0.001530271,float
+count per month of member interactions via vat with a lag of _5 from the score date in the past one year,cnt_cp_vat_5,0.001525539,integer
+count per month of member interactions via emails with a lag of _2 from the score date in the past one year,cnt_cp_emails_2,0.001510159,integer
+claim lines per month for a revenue code related to laboratory in the past one year,rev_pm_lab_pmpm_cd_ct,0.001455148,float
+visits per month for overall claims related to outpatient facilities in the past one year,total_outpatient_visit_ct_pmpm,0.001449824,double
+number of phramacies used per month in the past one year,rx_pharmacies_pmpm_ct,0.001446866,float
+claims per month related to diseases of the nervous system : other disorders of the nervous system in the past one year {based on CMS diagnosis code level2},cmsd2_ner_ner_other_pmpm_ct,0.00143267,float
+count per month of member interactions via webstatement in the past one year,cnt_cp_webstatement_pmpm_ct,0.001419656,float
+cost per month of prescriptions related to generic drugs in the past one year,rx_generic_pmpm_cost,0.001366419,float
+"Binary indicator that a member is deemed frail {specific diagnoses, multiple serious chronic conditions, functional impairments or other factors}",cms_frailty_ind,0.001360504,integer
+claims per month related to diseases of the circulatory system : hypertensive diseases in the past one year {based on CMS diagnosis code level2},cmsd2_cir_hypertensive_pmpm_ct,0.001351631,float
+claims per month related to diseases of the eye and adnexa : disorders of vitreous body and globe in the past one year {based on CMS diagnosis code level2},cmsd2_eye_vitreous_pmpm_ct,0.001309041,float
+"Total population, 5-year average",atlas_totalpopacs,0.001249298,double
+"Health Behaviors - Index of factors that contribute to a healthy food environment, 0 (worst) to 10 (best)",rwjf_food_env_inx,0.001192511,float
+cost per month of prescriptions related to non over the counter drugs in the past one year,rx_nonotc_pmpm_cost,0.001169442,float
+count per month of prescriptions related to maintenance drugs in the past one year,rx_maint_pmpm_ct,0.001163527,float
+Mail Order Buyer,cons_mobplus,0.001139274,string
+claims per month related to neoplasms in the past one year {based on CMS diagnosis code level1},cmsd1_can_pmpm_ct,0.001103783,float
+count per month of prescriptions related to non mail drugs in the past one year,rx_nonmail_pmpm_ct,0.001097276,float
+"claims per month related to mental, behavioral and neurodevelopmental disorders in the past one year {based on CMS diagnosis code level1}",cmsd1_men_pmpm_ct,0.001093135,float
+claim lines per month for a revenue code related to ambulatory surgical care in the past one year,rev_pm_asc_pmpm_cd_ct,0.001041673,float
+Member gender,sex_cd,0.001039898,string
+"claims per month related to diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism : coagulation defects, purpura and other hemorrhagic conditions in the past one year {based on CMS diagnosis code level2}",cmsd2_bld_hemorrhagic_pmpm_ct,0.001019786,float
+"count per month of distinct provider lines in the past one year {Based on provider line(FB-facility, PC-primary care, SP-specialist)}",prov_line_pmpm_cnt,0.000987844,double
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified in the past one year {based on CMS diagnosis code level1}",cmsd1_sns_pmpm_ct,0.000984295,float
+cost per month of prescriptions related to non behavioral health drugs in the past one year,rx_nonbh_pmpm_cost,0.000983112,float
+count per month of prescriptions related to non maintenance drugs in the past one year,rx_nonmaint_pmpm_ct,0.000980154,float
+Student Loan Index,cons_stlnindx,0.000962409,integer
+claims per month related to factors influencing health status and contact with health services : persons with potential health hazards related to family and personal history and certain conditions influencing health status in the past one year {based on CMS diagnosis code level2},cmsd2_vco_vco_other_pmpm_ct,0.000961226,float
+count per month of prescriptions related to non over the counter drugs in the past one year,rx_nonotc_pmpm_ct,0.000958268,float
+claims per month related to diseases of the genitourinary system in the past one year {based on CMS diagnosis code level1},cmsd1_gus_pmpm_ct,0.000949987,float
+number of prescriptions per month in the past one year,rx_overall_pmpm_ct,0.00093579,float
+count per month of member interactions via emails with a lag of _1 from the score date in the past one year,cnt_cp_emails_1,0.000918636,integer
+count per month of prescriptions related to mail drugs in the past one year,rx_mail_pmpm_ct,0.000917453,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : symptoms and signs involving the digestive system and abdomen in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_digest_abdomen_pmpm_ct,0.00091627,float
+count per month of member interactions via emails with a lag of _3 from the score date in the past one year,cnt_cp_emails_3,0.000907989,integer
+count per month of member interactions via emails in the past one year,cnt_cp_emails_pmpm_ct,0.000906214,float
+claims per month for a revenue code related to pharmacy in the past one year,rev_pm_phar_pmpm_ct,0.000903848,float
+count per month of prescriptions related to non behavioral health drugs in the past one year,rx_nonbh_pmpm_ct,0.000877821,float
+count per month of member interactions via emails with a lag of _8 from the score date in the past one year,cnt_cp_emails_8,0.000861258,integer
+count per month of member interactions via vat with a lag of _9 from the score date in the past one year,cnt_cp_vat_9,0.000850019,integer
+claims per month related to diseases of the eye and adnexa : disorders of choroid and retina in the past one year {based on CMS diagnosis code level2},cmsd2_eye_retina_pmpm_ct,0.00084647,float
+allowed cost per month for overall claims related to emergency room in the past one year,total_er_allowed_pmpm_cost,0.00083878,double
+count per month of member interactions via vat with a lag of _6 from the score date in the past one year,cnt_cp_vat_6,0.000832865,integer
+claims per month related to diseases of the respiratory system : acute upper respiratory infections in the past one year {based on CMS diagnosis code level2},cmsd2_res_res_up_pmpm_ct,0.000823992,float
+count per month of prescriptions related to generic drugs in the past one year,rx_generic_pmpm_ct,0.000823401,float
+claims per month related to factors influencing health status and contact with health services : persons encountering health services for examinations in the past one year {based on CMS diagnosis code level2},cmsd2_vco_exam_pmpm_ct,0.000819852,float
+count per month of prescriptions related to branded drugs in the past one year,rx_branded_pmpm_ct,0.00080743,float
+claim lines per month for a revenue code related to ct scan in the past one year,rev_pm_ct_pmpm_cd_ct,0.000800923,float
+"claims per month related to neoplasms : benign neoplasms, except benign neuroendocrine tumors in the past one year {based on CMS diagnosis code level2}",cmsd2_can_ben_neo_pmpm_ct,0.000800331,float
+Managing Health - Index,cons_hxmh,0.000793824,integer
+count per month of prescriptions related to MENTAL HEALTH - ANXIETY AGENTS drugs in the past one year {Based on Humana drug classification},rx_hum_56_pmpm_ct,0.000778445,float
+count per month of prescriptions related to THYROID drugs in the past one year {Based on Humana drug classification},rx_hum_91_pmpm_ct,0.000774896,float
+count per month of member interactions via print with a lag of _0 from the score date in the past one year,cnt_cp_print_0,0.000774896,integer
+count per month of member interactions via emails with a lag of _10 from the score date in the past one year,cnt_cp_emails_10,0.000755375,integer
+Diabetes Complication and Severity Index score based on claims in the past one year,dcsi_score,0.000754192,integer
+"claims per month related to endocrine, nutritional and metabolic diseases : metabolic disorders in the past one year {based on CMS diagnosis code level2}",cmsd2_end_metabolic_pmpm_ct,0.00072994,float
+"claims per month related to endocrine, nutritional and metabolic diseases in the past one year {based on CMS diagnosis code level1}",cmsd1_end_pmpm_ct,0.000716335,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : symptoms and signs involving the circulatory and respiratory systems in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_res_pmpm_ct,0.000715743,float
+count per month of behavioral health claims related to major depression in the past one year,bh_dema_pmpm_ct,0.000709828,float
+claims per month related to diseases of the circulatory system in the past one year {based on CMS diagnosis code level1},cmsd1_cir_pmpm_ct,0.000684984,float
+count per month of prescriptions related to Tier 2 drugs in the past one year,rx_tier_2_pmpm_ct,0.000645944,float
+count per month of member interactions via webstatement with a lag of _6 from the score date in the past one year,cnt_cp_webstatement_6,0.000645352,integer
+claim lines per month for a revenue code related to other imaging services in the past one year,rev_pm_ximage_pmpm_cd_ct,0.00062524,float
+claims per month related to diseases of the genitourinary system : acute kidney failure and chronic kidney disease in the past one year {based on CMS diagnosis code level2},cmsd2_gus_kidney_pmpm_ct,0.000624057,float
+count per month of prescriptions purchased at walgreen pharmacy in the past one year,rx_phar_cat_walgreen_pmpm_ct,0.000617551,float
+count per month of member interactions via webstatement with a lag of _4 from the score date in the past one year,cnt_cp_webstatement_4,0.000615776,integer
+"claims per month related to mental, behavioral and neurodevelopmental disorders : mood [affective] disorders in the past one year {based on CMS diagnosis code level2}",cmsd2_men_mad_pmpm_ct,0.000612818,float
+count per month of prescriptions related to Tier 4 drugs in the past one year,rx_tier_4_pmpm_ct,0.000602762,float
+claims per month related to diseases of the nervous system in the past one year {based on CMS diagnosis code level1},cmsd1_ner_pmpm_ct,0.000600396,float
+count per month of behavioral health claims related to chemical dependence: tobacco in the past one year,bh_cdto_pmpm_ct,0.000600396,float
+count per month of member interactions via webstatement with a lag of _11 from the score date in the past one year,cnt_cp_webstatement_11,0.000595073,integer
+count per month of member interactions via print with a lag of _8 from the score date in the past one year,cnt_cp_print_8,0.000588566,integer
+count per month of member interactions via print with a lag of _3 from the score date in the past one year,cnt_cp_print_3,0.000585017,integer
+count per month of member interactions via vat with a lag of _11 from the score date in the past one year,cnt_cp_vat_11,0.000579101,integer
+count per month of member interactions via print with a lag of _10 from the score date in the past one year,cnt_cp_print_10,0.000579101,integer
+count per month of prescriptions related to nonspecialty drugs in the past one year,rx_nonspecialty_pmpm_ct,0.00057851,float
+count per month of member interactions via webstatement with a lag of _9 from the score date in the past one year,cnt_cp_webstatement_9,0.000561947,integer
+"claims per month related to diseases of the circulatory system : diseases of arteries, arterioles and capillaries in the past one year {based on CMS diagnosis code level2}",cmsd2_cir_arteries_pmpm_ct,0.000532963,float
+Charlson Comorbidity Index value {sum of clinical and age components - adjusted for hierarchy} based on claims in the past one year,cci_score,0.000530597,float
+claims per month related to diseases of the respiratory system in the past one year {based on CMS diagnosis code level1},cmsd1_res_pmpm_ct,0.000525864,float
+"claims per month related to mental, behavioral and neurodevelopmental disorders : mental and behavioral disorders due to psychoactive substance use in the past one year {based on CMS diagnosis code level2}",cmsd2_men_men_substance_pmpm_ct,0.000519949,float
+allowed cost per month for behavioral health claims in the past one year,total_bh_allowed_pmpm_cost,0.000506344,double
+count per month of member interactions via vat with a lag of _2 from the score date in the past one year,cnt_cp_vat_2,0.000497471,integer
+Code indicating the type of risk adjustment factors in use for a member,cms_ra_factor_type_cd,0.000488007,string
+"claims per month related to injury, poisoning and certain other consequences of external causes in the past one year {based on CMS diagnosis code level1}",cmsd1_inj_pmpm_ct,0.000486824,float
+claims per month related to factors influencing health status and contact with health services : body mass index (bmi) in the past one year {based on CMS diagnosis code level2},cmsd2_vco_bmi_pmpm_ct,0.000475585,float
+claims per month related to diseases of the musculoskeletal system and connective tissue : disorders of bone density and structure in the past one year {based on CMS diagnosis code level2},cmsd2_mus_bone_pmpm_ct,0.00047381,float
+count per month of member interactions via vat with a lag of _10 from the score date in the past one year,cnt_cp_vat_10,0.000473219,integer
+claims per month related to diseases of the digestive system : other diseases of intestines in the past one year {based on CMS diagnosis code level2},cmsd2_dig_other_intest_pmpm_ct,0.000458431,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : general symptoms and signs in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_general_pmpm_ct,0.000453107,float
+count per month of prescriptions related to FERTILITY drugs in the past one year {Based on Humana drug classification},rx_hum_38_pmpm_ct,0.000448375,float
+claims per month related to diseases of the eye and adnexa in the past one year {based on CMS diagnosis code level1},cmsd1_eye_pmpm_ct,0.000439502,float
+Member geographic information - Rural Urban Continuum Code,rucc_category,0.00043891,string
+count per month of member interactions via print with a lag of _9 from the score date in the past one year,cnt_cp_print_9,0.000435361,integer
+count per month of member interactions via print with a lag of _1 from the score date in the past one year,cnt_cp_print_1,0.00042708,integer
+count per month of member interactions via webstatement with a lag of _1 from the score date in the past one year,cnt_cp_webstatement_1,0.000417024,integer
+count per month of member interactions via emails with a lag of _9 from the score date in the past one year,cnt_cp_emails_9,0.000411109,integer
+claims per month related to diseases of the musculoskeletal system and connective tissue : other dorsopathies in the past one year {based on CMS diagnosis code level2},cmsd2_mus_dorsopath_other_pmpm_ct,0.000408743,float
+claim lines per month for a revenue code related to emergency room in the past one year,rev_pm_er_pmpm_cd_ct,0.000406968,float
+count per month of member interactions via webstatement with a lag of _2 from the score date in the past one year,cnt_cp_webstatement_2,0.000401644,integer
+count per month of member interactions via vat with a lag of _3 from the score date in the past one year,cnt_cp_vat_3,0.000392772,integer
+count per month of prescriptions related to behavioral health drugs in the past one year,rx_bh_pmpm_ct,0.000383899,float
+count per month of member interactions via webstatement with a lag of _5 from the score date in the past one year,cnt_cp_webstatement_5,0.000379758,integer
+count per month of claims related to peripheral vascular disease in the past one year {Based on Charlson Comorbidity Index Categories},cci_pvd_pmpm_ct,0.000375026,float
+count per month of behavioral health claims related to other sleep in the past one year,bh_otsl_pmpm_ct,0.000371477,float
+claim lines per month for a revenue code related to radiology - diagnostic in the past one year,rev_pm_raddia_pmpm_cd_ct,0.000356689,float
+"Physical Environment - Indicator of the presence of health-related drinking water violations. Yes indicates the presence of a violation, No indicates no violation",rwjf_drinkwater_violate_ind,0.000351956,float
+claims per month related to diseases of the circulatory system : ischemic heart diseases in the past one year {based on CMS diagnosis code level2},cmsd2_cir_ischemic_pmpm_ct,0.000334802,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : abnormal findings on diagnostic imaging and in function studies, without diagnosis in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_imaging_pmpm_ct,0.000331253,float
+count per month of member interactions via print with a lag of _7 from the score date in the past one year,cnt_cp_print_7,0.000330662,integer
+count per month of member interactions via webstatement with a lag of _7 from the score date in the past one year,cnt_cp_webstatement_7,0.000325338,integer
+claims per month related to factors influencing health status and contact with health services in the past one year {based on CMS diagnosis code level1},cmsd1_vco_pmpm_ct,0.000322972,float
+count per month of member interactions via emails with a lag of _6 from the score date in the past one year,cnt_cp_emails_6,0.000321197,integer
+count per month of prescriptions related to CONTRACEPTIVES drugs in the past one year {Based on Humana drug classification},rx_hum_28_pmpm_ct,0.000319423,float
+"claims per month related to diseases of the eye and adnexa : disorders of ocular muscles, binocular movement, accommodation and refraction in the past one year {based on CMS diagnosis code level2}",cmsd2_eye_ocular_movement_pmpm_ct,0.000317057,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : symptoms and signs involving the genitourinary system in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_genitourinary_pmpm_ct,0.000315282,float
+claims per month related to diseases of the ear and mastoid process : other disorders of ear in the past one year {based on CMS diagnosis code level2},cmsd2_ear_ear_other_pmpm_ct,0.000309367,float
+"claims per month related to endocrine, nutritional and metabolic diseases : other nutritional deficiencies in the past one year {based on CMS diagnosis code level2}",cmsd2_end_nutr_def_pmpm_ct,0.000305226,float
+count per month of prescriptions related to Tier 3 drugs in the past one year,rx_tier_3_pmpm_ct,0.000303452,float
+claims per month related to diseases of the eye and adnexa : disorders of lens in the past one year {based on CMS diagnosis code level2},cmsd2_eye_lens_pmpm_ct,0.000277425,float
+count per month of prescriptions related to ALTERNATIVE MEDICINE drugs in the past one year {Based on Humana drug classification},rx_hum_01_pmpm_ct,0.000277425,float
+"claims per month related to mental, behavioral and neurodevelopmental disorders : anxiety, dissociative, stress-related, somatoform and other nonpsychotic mental disorders in the past one year {based on CMS diagnosis code level2}",cmsd2_men_nonpsychotic_pmpm_ct,0.000276241,float
+claims per month related to diseases of the skin and subcutaneous tissue in the past one year {based on CMS diagnosis code level1},cmsd1_skn_pmpm_ct,0.000270918,float
+count per month of prescriptions related to PAIN MGMT - NARCOTIC ANALGESICS drugs in the past one year {Based on Humana drug classification},rx_hum_76_pmpm_ct,0.000268552,float
+count per month of member interactions via vat with a lag of _8 from the score date in the past one year,cnt_cp_vat_8,0.000266186,integer
+count per month of prescriptions related to COUGH/ COLD/ ALLERGY drugs in the past one year {Based on Humana drug classification},rx_hum_29_pmpm_ct,0.000263819,float
+cost per month of prescriptions related to branded drugs in the past one year,rx_branded_pmpm_cost,0.000256721,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : symptoms and signs involving the skin and subcutaneous tissue in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_skn_pmpm_ct,0.000253172,float
+claim lines per month for a revenue code related to pharmacy in the past one year,rev_pm_phar_pmpm_cd_ct,0.000249623,float
+count per month of member interactions via webstatement with a lag of _10 from the score date in the past one year,cnt_cp_webstatement_10,0.000245482,integer
+count per month of member interactions via print with a lag of _4 from the score date in the past one year,cnt_cp_print_4,0.000244891,integer
+count per month of member interactions via vat with a lag of _7 from the score date in the past one year,cnt_cp_vat_7,0.000241933,integer
+cost per month of prescriptions related to DERMATOLOGY - PSORIASIS AGENTS drugs in the past one year {Based on Humana drug classification},rx_hum_32_pmpm_cost,0.000236609,float
+cost per month of prescriptions related to THYROID drugs in the past one year {Based on Humana drug classification},rx_hum_91_pmpm_cost,0.00022537,float
+count per month of member interactions via emails with a lag of _0 from the score date in the past one year,cnt_cp_emails_0,0.000224779,integer
+claims per month related to factors influencing health status and contact with health services : persons with potential health hazards related to communicable diseases in the past one year {based on CMS diagnosis code level2},cmsd2_vco_communicable_pmpm_ct,0.000223596,float
+claims per month related to diseases of the musculoskeletal system and connective tissue : other soft tissue disorders in the past one year {based on CMS diagnosis code level2},cmsd2_mus_soft_tissue_pmpm_ct,0.000219455,float
+claims per month related to diseases of the skin and subcutaneous tissue : other disorders of the skin and subcutaneous tissue in the past one year {based on CMS diagnosis code level2},cmsd2_skn_skn_other_pmpm_ct,0.000218272,float
+count per month of member interactions via emails with a lag of _11 from the score date in the past one year,cnt_cp_emails_11,0.000214131,integer
+count per month of member interactions via print with a lag of _5 from the score date in the past one year,cnt_cp_print_5,0.000212357,integer
+count per month of prescriptions related to PAIN MGMT - MUSCLE RELAXANTS drugs in the past one year {Based on Humana drug classification},rx_hum_75_pmpm_ct,0.000211765,float
+claims per month related to diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism in the past one year {based on CMS diagnosis code level1},cmsd1_bld_pmpm_ct,0.000211174,float
+"claims per month related to symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified : abnormal findings on examination of blood, without diagnosis in the past one year {based on CMS diagnosis code level2}",cmsd2_sns_blood_pmpm_ct,0.000210582,float
+number of physicians per month associated with pharmacies in the past one year,rx_perphy_pmpm_ct,0.000209991,float
+NA,cmsd2_ner_episodic_paroxysmal_pmpm_ct,0.000208808,NA
+count per month of member interactions via print with a lag of _11 from the score date in the past one year,cnt_cp_print_11,0.000208216,integer
+claims per month related to diseases of the respiratory system : chronic lower respiratory diseases in the past one year {based on CMS diagnosis code level2},cmsd2_res_res_lower_pmpm_ct,0.00020585,float
+claims per month related to diseases of the musculoskeletal system and connective tissue : osteoarthritis in the past one year {based on CMS diagnosis code level2},cmsd2_mus_osteoarth_pmpm_ct,0.000203484,float
+claims per month related to diseases of the digestive system in the past one year {based on CMS diagnosis code level1},cmsd1_dig_pmpm_ct,0.000202301,float
+count per month of prescriptions related to DERMATOLOGY - PSORIASIS AGENTS drugs in the past one year {Based on Humana drug classification},rx_hum_32_pmpm_ct,0.000196386,float
+claims per month related to diseases of the musculoskeletal system and connective tissue : other joint disorders in the past one year {based on CMS diagnosis code level2},cmsd2_mus_joint_pmpm_ct,0.000192245,float
+count per month of member interactions via vat with a lag of _4 from the score date in the past one year,cnt_cp_vat_4,0.000172725,integer
+count per month of member interactions via emails with a lag of _5 from the score date in the past one year,cnt_cp_emails_5,0.00017095,integer
+count per month of member interactions via emails with a lag of _7 from the score date in the past one year,cnt_cp_emails_7,0.000170359,integer
+"claims per month related to endocrine, nutritional and metabolic diseases : overweight, obesity and other hyperalimentation in the past one year {based on CMS diagnosis code level2}",cmsd2_end_obese_pmpm_ct,0.000164444,float
+count per month of prescriptions related to RHEUMATOID ARTHRITIS drugs in the past one year {Based on Humana drug classification},rx_hum_86_pmpm_ct,0.000155571,float
+count per month of member interactions via vat with a lag of _1 from the score date in the past one year,cnt_cp_vat_1,0.000153796,integer
+count per month of prescriptions related to TEST SUPPLIES drugs in the past one year {Based on Humana drug classification},rx_hum_90_pmpm_ct,0.000149064,float
+count per month of member interactions via print with a lag of _6 from the score date in the past one year,cnt_cp_print_6,0.000147881,integer
+count per month of member interactions via vat with a lag of _0 from the score date in the past one year,cnt_cp_vat_0,0.000146698,integer
+claims per month related to diseases of the circulatory system : other forms of heart disease in the past one year {based on CMS diagnosis code level2},cmsd2_cir_other_heart_disease_pmpm_ct,0.0001396,float
+claims per month related to diseases of the ear and mastoid process in the past one year {based on CMS diagnosis code level1},cmsd1_ear_pmpm_ct,0.000128361,float
+count per month of member interactions via emails with a lag of _4 from the score date in the past one year,cnt_cp_emails_4,0.000126586,integer
+Binary indicator that a member is eligible for Medicaid and Medicare with PartD Low Income Multiplier,cms_dual_eligible_ind,0.000124811,integer
+NA,cmsd2_skn_derm_eczema_pmpm_ct,0.000118305,NA
+claim lines per month for a revenue code related to electrocardiogram in the past one year,rev_pm_ekgecg_pmpm_cd_ct,0.000105883,float
+claim lines per month for a revenue code related to specialty services in the past one year,rev_pm_obsrm_pmpm_cd_ct,0.000105883,float
+claim lines per month for a revenue code related to laboratory pathology in the past one year,rev_pm_labpth_pmpm_cd_ct,0.0001047,float
+count per month of member interactions via webstatement with a lag of _8 from the score date in the past one year,cnt_cp_webstatement_8,1.00E-04,integer
+claims per month related to factors influencing health status and contact with health services : encounters for other specific health care in the past one year {based on CMS diagnosis code level2},cmsd2_vco_vco_other_spec_pmpm_ct,1.00E-04,float
+"a binary value indicating if a service related to mental, behavioral and neurodevelopmental disorders : mood [affective] disorders was performed in the past one year {based on CMS diagnosis code level2}",cmsd2_men_mad_ind,9.52E-05,integer
+"claims per month related to diseases of the eye and adnexa : disorders of eyelid, lacrimal system and orbit in the past one year {based on CMS diagnosis code level2}",cmsd2_eye_lacrimal_pmpm_ct,8.46E-05,float
+count per month of claims related to chronic pulmonary disease in the past one year {Based on Charlson Comorbidity Index Categories},cci_cpd_pmpm_ct,8.04E-05,float
+claim lines per month for a revenue code related to cardiology in the past one year,rev_pm_card_pmpm_cd_ct,7.99E-05,float
+visits per month for overall claims related to emergency room in the past one year,total_er_visit_ct_pmpm,7.63E-05,double
+claims per month related to diseases of the musculoskeletal system and connective tissue : spondylopathies in the past one year {based on CMS diagnosis code level2},cmsd2_mus_spondylopath_pmpm_ct,7.39E-05,float
+claim lines per month for a revenue code related to anesthesiology in the past one year,rev_pm_ansth_pmpm_cd_ct,7.39E-05,float
+claims per month related to diseases of the respiratory system : other diseases of upper respiratory tract in the past one year {based on CMS diagnosis code level2},cmsd2_res_res_up_other_pmpm_ct,7.10E-05,float
+claims per month related to certain infectious and parasitic diseases in the past one year {based on CMS diagnosis code level1},cmsd1_inf_pmpm_ct,6.92E-05,float
+count per month of member interactions via print with a lag of _2 from the score date in the past one year,cnt_cp_print_2,5.97E-05,integer
+claim lines per month for a revenue code related to other diagnostic services in the past one year,rev_pm_xdiag_pmpm_cd_ct,5.03E-05,float
+visits per month for overall claims related to ambulance place of treatment in the past one year,total_ambulance_visit_ct_pmpm,4.73E-05,double
+claims per month related to diseases of the genitourinary system : other diseases of the urinary system in the past one year {based on CMS diagnosis code level2},cmsd2_gus_urinary_other_pmpm_ct,4.55E-05,float
+visits per month for overall claims related to urgent care in the past one year,total_urgent_care_visit_ct_pmpm,4.20E-05,double
+Preferred language for member,lang_spoken_cd,2.66E-05,string
+admits per month for overall claims related to acute inpatient facilities in the past one year,total_ip_acute_admit_ct_pmpm,2.60E-05,double
+claim lines per month for a revenue code related to recovery room in the past one year,rev_pm_recrm_pmpm_cd_ct,2.43E-05,float
+claim lines per month for a revenue code related to medical/surgical supplies and devices in the past one year,rev_pm_mssd_pmpm_cd_ct,2.31E-05,float
+NA,cmsd2_dig_esoph_stomach_pmpm_ct,1.24E-05,NA
+NA,metro,0,NA
+claim lines per month for a revenue code related to operating room in the past one year,rev_pm_oroom_pmpm_cd_ct,-5.32E-06,float
+Binary indicator that a Medicare Supplement member is under age 65,cms_disabled_ind,-2.78E-05,integer

@@ -1,0 +1,21 @@
+---
+title: "visualization_ggplot"
+author: "Jiaqi Chen"
+date: "2022-10-09"
+output: pdf_document
+---
+
+```{r}
+data <- data.frame(x = c("no housing insecure", "housing insecure"),
+                y = c(32328, 32248))
+
+p <- ggplot(data = oversample, aes(x = x, y = y)) + geom_bar(stat = "identity", width = 0.4, fill = "steelblue") + geom_text(aes(label = sample), vjust = 1.6, color = "white", size = 3.5) + theme_minimal()
+
+text <- element_text(face = "bold", color = "steelblue")
+
+p <- p + labs(title = "Over Sampling Data Sample", x = "Housing Insecurity Type", y = "Sample") + theme(plot.title = element_text(hjust = 0.5)) + theme(plot.title = text, axis.title = text)
+p
+```
+
+
+

@@ -1,0 +1,99 @@
+---
+title: "Neural Network"
+author: "Yiru Gong, yg2832"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r, warning=FALSE}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+library(caret)
+library(ranger)
+library(pROC)
+library(xgboost)
+library(keras)
+library(tfruns)
+library(mice)
+```
+
+```{r}
+# load("balanced_data.Rdata") ## for balanced train data: data_rose
+load("final.Rdata") ## for original full dataset: final 
+cat_idx2 = c(cat_idx, 'metro')
+
+## training data
+# train = data_rose ##for balanced data
+train = final[rowTrain,] ##for original data
+x = train[,-1]  
+y = train$hi_flag  
+
+## testing data
+test = final[-rowTrain,]
+x2 = final[-rowTrain,-1]   
+y2 = final$hi_flag[-rowTrain]
+
+```
+
+## Neural network training
+
+```{r}
+load("split_data_matrix.Rdata")
+## tuning
+runs <- tuning_run("keras_grid_search_new.R", 
+                   flags = list(
+                   nodes_layer1 = c(16, 32, 64, 128),
+                   nodes_layer2 = c(16, 32, 64, 128),
+                   nodes_layer3 = c(16, 32, 64),
+                   dropout_layer1 = c(0.3, 0.4,0.5),
+                   dropout_layer2 = c(0.3, 0.4,0.5),
+                   dropout_layer3 = c(0.3, 0.4,0.5)),
+                   confirm = FALSE,
+                   echo = FALSE,
+                   sample = 0.01) # try more after class
+
+best = runs[which.max(runs$metric_auc),]
+best
+max(runs$metric_val_auc)
+```
+
+```{r}
+train_labels_cat <- to_categorical(train_labels, 2)
+test_labels_cat <- to_categorical(test_labels, 2)
+
+model.nn <- keras_model_sequential() %>%
+  layer_dense(units = best$flag_nodes_layer1, activation = "relu", input_shape = ncol(train_data)) %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer1) %>%
+  layer_dense(units = best$flag_nodes_layer2, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer2) %>%
+  layer_dense(units = best$flag_nodes_layer3, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer3) %>%
+  layer_dense(units = 2, activation = "sigmoid") %>%
+  compile(loss = "binary_crossentropy",
+          optimizer = optimizer_adam(), 
+          metrics = "AUC") 
+fit.nn = model.nn %>% 
+  fit(x = train_data, 
+      y = train_labels_cat, 
+      epochs = 50, 
+      batch_size = 256,
+      validation_split = 0.2,
+      class_weight = list('0'=1,'1'=30),
+      callbacks = list(callback_early_stopping(patience = 10),
+                       callback_reduce_lr_on_plateau()),
+      verbose = 2)
+plot(fit.nn)
+
+## testing and evaluation
+score <- model.nn %>% evaluate(test_data, test_labels_cat)
+nn_pred = predict(model.nn, test_data)[,2]
+roc(test_labels, nn_pred)
+```
+

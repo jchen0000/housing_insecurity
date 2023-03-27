@@ -1,0 +1,578 @@
+---
+title: "new_data"
+author: "LYU JING"
+date: "9/22/2022"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+```
+
+1. Clean 
+
+2. DATA DISCRIPTION: 1.FEATURE CLASSIFICATIOn; 2.age/gender 3.housing insecure
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(recipes)
+library(caret)
+
+
+training = read_csv("data/training_new.csv") 
+
+  
+```
+
+```{r}
+data_num <- training[ ,unlist(lapply(training, is.numeric))]
+
+#names(data_num)
+
+
+```
+
+
+```{r}
+
+
+column_limit_na = names(which(colSums(is.na(data_num))<10000))
+
+```
+
+```{r}
+#skimr::skim(data_num)
+```
+
+
+```{r}
+data_have_limit_na = data_num[,column_limit_na]
+
+data_num2 = data_have_limit_na %>% 
+  select(hi_flag,-id,everything())
+
+#%>%drop_na()
+```
+
+
+```{r}
+
+rec1 = recipe(hi_flag ~ ., data = data_num2) %>%
+  step_impute_bag(all_predictors()) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) %>% 
+  step_nzv(all_predictors()) 
+#%>%
+#  step_pca(all_predictors(), threshold = .95) 
+
+prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_predictors()) %>% 
+  ncol()
+
+select_features = prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_outcomes(),all_predictors())
+
+process_select_vec = sort(colnames(select_features))
+
+
+library(stringr)
+names_select = str_split("cci_score
+cms_disabled_ind
+cms_dual_eligible_ind
+cms_frailty_ind
+cms_hospice_ind
+cms_institutional_ind
+cms_low_income_ind
+cms_ma_plan_ind
+cms_ma_risk_score_nbr
+cms_orig_reas_entitle_cd
+cms_ra_factor_type_cd
+cms_race_cd
+cmsd2_men_mad_ind
+cons_homstat
+cons_hxmboh
+cons_hxmh
+cons_hxmioc
+cons_mobplus
+cons_stlindex
+cons_stlnindx
+dcsi_score
+est_age
+hi_flag
+id
+lang_spoken_cd
+prov_line_pmpm_cnt
+rucc_category
+sex_cd"
+,
+"\n"
+)
+
+meaningful_select_vec = unlist(names_select)
+new_imp
+```
+
+
+```{r}
+
+select_features$hi_flag <- factor(select_features$hi_flag)
+set.seed(2)
+ldaProfile <- rfe(x=select_features[,3:199],y = select_features$hi_flag,
+                  sizes = seq(107,197,5),
+                  rfeControl = rfeControl(functions = ldaFuncs, method = "cv"))
+
+ldaProfile
+predictors(ldaProfile)
+plot(ldaProfile, type = c("o", "g"))
+```
+
+
+```{r}
+
+
+ctrl <- rfeControl(functions = rfRFE, # random forest
+                      method = "repeatedcv", # repeated cv
+                      repeats = 1, # number of repeats
+                      number = 10,
+                   returnResamp = "all") # number of folds
+
+
+
+```
+change back to rf
+
+
+```{r}
+library(doMC)
+registerDoMC(cores = 2)
+
+set.seed(10)
+result_rfe1 <- rfe(x=new_imp[,3:199],y = new_imp$id, sizes = seq(100,150,50), rfeControl = ctrl)
+
+
+# Print the results
+result_rfe1
+
+# Print the selected features
+predictors(result_rfe1)
+
+
+
+trellis.par.set(caretTheme())
+plot(result_rfe1, type = c("g", "o"))
+
+# Print the results visually
+
+```
+For RFE we exactly return five variables:
+Select TOP 5 Variables:
+
+```{r}
+
+rfe_predictor = predictors(result_rfe1)
+
+rfe_predictor
+
+```
+
+2. receipt imputation
+ 
+3. RFE
+
+```{r}
+new_imp$hi_flag = as.factor(new_imp$hi_flag)
+levels(new_imp$hi_flag) = c("no","yes")
+# check na
+# a = new_imp%>% 
+#   summarise_all(funs(sum(is.na(.))))
+
+# impute by median
+new_imp <- new_imp %>% mutate(across(cnt_cp_vat_1, ~replace_na(., median(., na.rm=TRUE))))
+```
+
+
+```{r}
+rfRFE <-  list(summary = defaultSummary,
+               fit = function(x, y, first, last, ...){
+                 library(randomForest)
+                 randomForest(x, y, importance = first, ...)
+                 },
+               pred = function(object, x)  predict(object, x),
+               rank = function(object, x, y) {
+                 vimp <- varImp(object)
+                 vimp <- vimp[order(vimp$Overall,decreasing = TRUE),,drop = FALSE]
+                 vimp$var <- rownames(vimp)                  
+                 vimp
+                 },
+               selectSize = pickSizeBest,
+               selectVar = pickVars)
+
+
+ctrl <- rfeControl(functions = rfRFE, # random forest
+                      method = "repeatedcv", # repeated cv
+                      repeats = 1, # number of repeats
+                      number = 10,
+                   returnResamp = "all") # number of folds
+
+library(doMC)
+registerDoMC(cores = 2)
+```
+
+```{r}
+start = Sys.time()
+
+set.seed(10)
+result_rfe1 <- rfe(x=new_imp[,2:237],y = new_imp$hi_flag, sizes = seq(100,230,10), rfeControl = ctrl)
+
+
+# Print the results
+result_rfe1
+
+Sys.time() - start
+
+```
+
+```{r}
+library(doMC)
+registerDoMC(cores = 2)
+
+set.seed(10)
+result_rfe1 <- rfe(x=select_features[,3:199],y = select_features$id, sizes = seq(100,150,50), rfeControl = ctrl)
+
+
+# Print the results
+result_rfe1
+
+# Print the selected features
+predictors(result_rfe1)
+
+
+
+trellis.par.set(caretTheme())
+plot(result_rfe1, type = c("g", "o"))
+
+# Print the results visually
+
+```
+
+
+remove the sensitive features does not nessasarily reduce unfairness.
+
+Fairness will be measured using the observed Disparity score based on RACE and SEX
+
+```{r}
+load("full_imputed.Rdata")
+new_imp
+```
+processing:
+
+```{r}
+df_valid = new[-rowTrain,]
+
+df_valid$prob1 = predict(
+  lgb.model,
+  x2_lgb,
+  type = "response")
+
+df_valid$prob2 = test.pred.prob
+
+```
+
+
+```{r}
+final$cms_race_cd
+new_imp$sex_cd
+summary(new_imp$sex_cd)
+```
+
+```{r}
+library(fairness)
+
+res_auc <- roc_parity(data         = df_valid, 
+                      outcome      = 'Two_yr_Recidivism_01', 
+                      group        = 'Female',
+                      probs        = 'prob_2', 
+                      base         = 'Male')
+res_auc$Metric
+```
+
+```{r}
+
+df_valid$cms_race_cd
+df_valid$hi_flag
+df_valid$prob1
+df_valid$prob2
+df_valid$sex_cd
+
+data = df_valid[,c("cms_race_cd","hi_flag","prob1","prob2","sex_cd")]
+
+res_eq <- equal_odds(data         = df_valid, 
+                     outcome      = 'hi_flag', 
+                     outcome_base = '0', 
+                     group        = 'sex_cd',
+                     probs        = 'prob2', 
+                     cutoff       = 0.5, 
+                     base         = 'M')  
+m_g = res_eq$Metric
+
+
+res_eq_r <- equal_odds(data         = df_valid, 
+                     outcome      = 'hi_flag', 
+                     outcome_base = '0', 
+                     group        = 'cms_race_cd',
+                     probs        = 'prob2', 
+                     cutoff       = 0.5, 
+                     base         = '0')  
+m_r = res_eq_r$Metric
+```
+
+```{r}
+sum1 = 0
+for (i in m_g[2,]){
+  if (i<=1){
+    sum = sum + i
+  }
+  else{
+    sum = sum + 1
+  }
+}
+
+disparity_score_g = sum1/length(m_g[2,])
+disparity_score_g
+```
+
+
+
+```{r}
+sum = 0
+for (i in m_r[2,]){
+  if (i<=1){
+    sum = sum + i
+  }
+  else{
+    sum = sum + 1
+  }
+}
+
+disparity_score_r = sum/length(m_r[2,])
+disparity_score_r
+```
+```{r}
+sum1 + sum/(length(m_r[2,])+length(m_g[2,]))
+```
+
+
+```{r}
+
+final2 = final
+final2 = final2 %>% 
+  mutate_if(is.factor,as.numeric) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+
+
+trainTask <- makeClassifTask(data = final2[rowTrain,], target = "hi_flag", positive = 1)
+testTask <- makeClassifTask(data = final2[-rowTrain,], target = "hi_flag")
+
+
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "error",
+    nrounds = 200
+  )
+)
+
+xgb_model <- train(xgb_learner, task = trainTask)
+```
+
+
+
+```{r}
+library(mlr)
+
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 200, upper = 600),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 10),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .1, upper = .6),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+getParamSet("classif.xgboost")
+control <- makeTuneControlRandom(maxit = 1)
+
+resample_desc <- makeResampleDesc("CV", iters = 4)
+
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+
+#Tune-x] 1: nrounds=462; max_depth=4; eta=0.312; lambda=0.144
+```
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model <- train(xgb_tuned_learner, trainTask)
+
+pred3 <- predict(xgb_model, testTask, type="prob")
+
+pred3$data$response
+
+roc_xgboost3 <- roc(pred3$data$truth, pred3$data$prob.0) ## 0.7268
+
+```
+
+
+
+
+
+```{r}
+library(readr)
+variable_importance <- read_csv("variable importance.csv")
+var_imp = variable_importance[variable_importance$value>0.0001,]$var
+
+```
+
+
+
+```{r}
+library(mlr)
+```
+
+
+```{r}
+#x = train[,-1]  ## training data
+#y = train$hi_flag   
+#x2 = final[-rowTrain,-1]   ## testing data
+#y2 = final$hi_flag[-rowTrain]
+
+
+  
+
+final_m = final
+final3 = final_m %>% 
+  mutate_if(is.character,as.factor)
+
+
+
+rec1 <- recipe(hi_flag ~ ., data = final3) %>% 
+  step_dummy(all_nominal_predictors())
+
+prep1 <- prep(rec1, training = final3)
+
+final2 <- bake(prep1, new_data = final3)
+
+final2$hi_flag = final3$hi_flag
+
+sort(colnames(final2))
+
+library(mlr)
+
+trainTask <- makeClassifTask(data = final2[rowTrain,], target = "hi_flag", positive = 1)
+testTask <- makeClassifTask(data = final2[-rowTrain,], target = "hi_flag")
+
+
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 200
+  )
+)
+
+xgb_model <- mlr::train(xgb_learner, task = trainTask)
+```
+
+
+
+```{r}
+
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 50, upper = 300),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 30),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .05, upper = .5),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+
+
+getParamSet("classif.xgboost")
+
+control <- makeTuneControlRandom(maxit = 1)
+
+set.seed(1)
+resample_desc <- makeResampleDesc("CV", iters = 10)
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+
+# Result: nrounds=240; max_depth=3; eta=0.287; lambda=0.586 : mmce.test.mean=0.0452811
+# 0.7025
+
+# Result: nrounds=272; max_depth=1; eta=0.337; lambda=0.214 : mmce.test.mean=0.0438911
+# 0.737
+
+#balanced
+#[Tune] Result: nrounds=268; max_depth=4; eta=0.125; lambda=0.105 : mmce.test.mean=0.1142048
+# 0.9577
+
+# Result: nrounds=177; max_depth=10; eta=0.308; lambda=0.436 : mmce.test.mean=0.1156836
+
+#seed.1 [Tune] Result: nrounds=244; max_depth=3; eta=0.0639; lambda=0.206 : mmce.test.mean=0.1446276
+# 0.9537
+```
+
+
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model <- mlr::train(xgb_tuned_learner, trainTask)
+
+pred3 <- predict(xgb_model, testTask, type="prob")
+
+pred3$data$response
+
+roc_xgboost3 <- roc(pred3$data$truth, pred3$data$prob.1) ## 0.7268
+roc_xgboost3
+
+```
+```{r}
+save(xgb_model,file = "xgb_model.Rdata")
+```

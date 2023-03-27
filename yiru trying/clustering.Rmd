@@ -1,0 +1,94 @@
+---
+title: "Clustering"
+author: "Yiru Gong, yg2832"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(Rtsne)
+library(caret)
+```
+
+
+```{r}
+load("final.Rdata")
+
+num = final %>% 
+  select_if(is.numeric)
+cat = final %>% 
+  select_if(is.factor)
+# y = final$hi_flag
+
+tsne = Rtsne(num)
+tsne_df = tsne$Y %>% 
+  as.data.frame() %>% 
+  rename(tsne1 = "V1",
+         tsne2 = "V2")
+tsne_df = cbind(tsne_df, hi_flag = final$hi_flag, cat)
+```
+
+```{r}
+tsne_df %>%
+  ggplot(aes(x = tsne1, 
+             y = tsne2,
+             color = cons_stlnindx))+
+  geom_point()+
+  theme(legend.position="bottom")
+```
+
+## clustering
+
+...
+
+
+## stacking models
+
+* lgb.model --> tuned lgb model with enlarged dataset 260 --> lgb_pred
+* xgb_model --> tuned xgboost with 235 dataset --> pred3$data$prob.1
+
+```{r}
+# save(lgb.model, xgb_model, lgb_pred, pred3, file = "stack_tmp.Rdata")
+# load("stack_tmp.Rdata")
+```
+
+
+```{r}
+cor(lgb_pred, pred3$data$prob.1) # 0.7278
+
+# train data predictive results
+lgb_pred_train = predict(lgb.model, train_lgb[,-1])
+xgboost_pred_train = predict(xgb_model, trainTask, type = "prob")
+
+stack_train = cbind(lgb = lgb_pred_train, 
+                    xgboost = xgboost_pred_train$data$prob.1,
+                    hi_flag = y) %>% 
+  as.data.frame()
+
+#test data predictive results
+stack_test = cbind(lgb = lgb_pred, xgboost = pred3$data$prob.1) 
+                   # hi_flag = y2)
+```
+
+```{r}
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+stack.model <- caret::train(hi_flag ~ .,
+                data = stack_train,
+                method = "glm",
+                family= "binomial",
+                metric = "ROC",
+                trControl = ctrl)
+stack.model$results$ROC # 0.7353115
+
+stack.pred <- predict(stack.model, newdata = stack_test, type = "prob")[,2]
+roc(y2, stack.pred)
+```
+

@@ -1,0 +1,284 @@
+---
+title: "xgboost final model_jiaqi"
+author: "Jiaqi Chen"
+date: "2022-10-05"
+output: pdf_document
+---
+
+```{r, warning=FALSE}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+library(caret)
+library(ranger)
+library(pROC)
+library(xgboost)
+library(keras)
+library(tfruns)
+library(mice)
+```
+
+# Data without Imputation
+```{r}
+new = fread('../training_new.csv') %>% 
+  janitor::clean_names() %>% 
+  as.data.frame()
+# new_cat = new[,..col_cat]
+new = new[,-c(1,2)]
+
+heading = read_excel('../Humana_Mays_2022_DataDictionary.xlsx', sheet = 'Data Dictionary')
+heading = heading %>% janitor::clean_names()
+
+######### change categorical data type to factor
+col_cat = heading[which(heading$data_type == 'string'),]$feature_name
+
+int_idx = c("cms_disabled_ind", "cons_hxmioc", "cons_hxmboh", "cons_stlnindx", "cmsd2_men_mad_ind", "cms_dual_eligible_ind", "cons_stlindex", "cms_low_income_ind", "cons_hxmh", "cms_frailty_ind")
+
+cat_idx = c(col_cat, int_idx)
+
+## cat to factor
+new = new %>% 
+  mutate_at(cat_idx, as.factor)
+
+# numeric data selection
+data_num <- new[ ,unlist(lapply(new, is.numeric))]
+
+column_limit_na = names(which(colSums(is.na(data_num)) < 10000))
+
+data_have_limit_na = data_num[,column_limit_na]
+
+data_num2 = data_have_limit_na %>% 
+  select(hi_flag,everything())
+
+rec1 = recipe(hi_flag ~ ., data = data_num2) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) %>% 
+  step_nzv(all_predictors()) 
+
+prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_predictors()) %>% 
+  ncol()
+
+select_features = prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_outcomes(),all_predictors())
+
+process_select_vec = sort(colnames(select_features))
+
+cat = new[,cat_idx]
+
+all_selected = cbind(select_features,cat) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+
+save(all_selected,file = "not_imputed.Rdata")
+
+# load("not_imputed.Rdata")
+final = all_selected
+
+# remove duplicated column names
+#duplicate = duplicated(colnames(final))
+#final = final[, !duplicate]
+# # remove duplicated column names
+# duplicate = duplicated(colnames(final))
+# final = final[, !duplicate]
+
+```
+
+
+# Final Dataset with imputation
+```{r}
+load("final.Rdata") ## for original full dataset: final
+# load("balanced_data.Rdata")
+# train = data_rose
+```
+
+# Final Dataset without imputation
+```{r}
+# dataset without imputation
+## training data
+# load("balanced_data.Rdata")
+#train = data_rose %>% select(colnames(final))
+
+#x = train[-1]  
+#y = train$hi_flag 
+
+#train2 = train %>% 
+#  mutate_if(is.factor,as.numeric) %>% 
+#  mutate(hi_flag = as.factor(hi_flag))
+```
+
+# train vs test dataset
+```{r}
+rowTrain <- createDataPartition(y = final$hi_flag,
+                                p = 0.8,
+                                list = FALSE)
+x = final[rowTrain,-1]  
+
+# x = train[-1]  #train with balanced data
+y = final$hi_flag  
+
+## testing data
+x2 = final[-rowTrain,-1]   
+y2 = final$hi_flag[-rowTrain]
+test = cbind(x2,hi_flag = y2)
+```
+
+# XGBoost
+```{r}
+final2 = final
+final2 = final2 %>% 
+  mutate_if(is.factor,as.numeric) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+
+library(mlr)
+
+trainTask <- makeClassifTask(data = final2[rowTrain,], target = "hi_flag", positive = 1)
+testTask <- makeClassifTask(data = final2[-rowTrain,], target = "hi_flag")
+
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 200
+  )
+)
+
+xgb_model <- train(xgb_learner, task = trainTask)
+```
+
+
+```{r}
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 200, upper = 600),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 10),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .1, upper = .6),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+getParamSet("classif.xgboost")
+
+control <- makeTuneControlRandom(maxit = 1)
+
+set.seed(1)
+resample_desc <- makeResampleDesc("CV", iters = 4)
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+
+
+```
+
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model <- train(xgb_tuned_learner, trainTask)
+
+pred3 <- predict(xgb_model, testTask, type = "prob")
+
+pred3$data$response
+
+pred3$data$prob.0
+
+roc_xgboost3 <- roc(pred3$data$truth, pred3$data$prob.0)
+
+roc_xgboost3
+
+## 0.7041  balanced data with imputation
+## 0.6854  balanced data without imputation
+## 0.7190  unbalanced data with imputation
+## 0.6894  unbalanced data without imputation
+## 0.7492 0.8 train 0.2 test
+```
+
+# Result submission
+
+```{r}
+# holdout data manipulation
+all_feature = colnames(select(final,-hi_flag,-metro))
+cat_idx2 = c(cat_idx,"metro")
+num_idx = setdiff(all_feature,cat_idx2)
+
+## feature selection
+holdout = read.csv("../2022_Competition_Holdout.csv") %>% 
+  janitor::clean_names()
+holdout[holdout=='null'] = NA
+holdout_id = holdout$id
+
+holdout = holdout %>% 
+  select_at(all_feature) %>%
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) ) %>% 
+  mutate_at(cat_idx2, as.factor) %>% 
+  mutate_at(num_idx,as.numeric)
+### view the NA condition
+h.na = sapply(holdout,function(x) sum(is.na(x)))
+h.na[which(h.na>0)]
+```
+
+## Ver2: XGBoost
+```{r}
+train3 = final %>% 
+  mutate_if(is.factor,as.numeric) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+  
+
+final3 = holdout %>% 
+  mutate_if(is.factor,as.numeric) 
+
+library(mlr)
+
+trainTask2 <- makeClassifTask(data = train3, target = "hi_flag", positive = 1)
+
+label = sample(0:1, size = 12220, replace = T)
+final3$hi_flag = label
+testTask2 <- makeClassifTask(data = final3, target = "hi_flag", positive = 1)
+```
+
+# New Model for Train.csv
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model2 <- train(xgb_tuned_learner, trainTask2)
+
+pred4 <- predict(xgb_model2, testTask2, type = "prob")
+
+prob = pred4$data$prob.1
+
+```
+
+```{r}
+output = cbind(ID = holdout_id, 
+               SCORE = prob,  #or pred4$data$response (a column of probability)
+               RANK = rank(-prob,ties.method = "last"))
+write.csv(output,"2022CaseCompetition_Yiru_Gong_20221013.csv",row.names = F)
+```
+
+
+
+

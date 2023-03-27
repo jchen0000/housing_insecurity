@@ -1,0 +1,1320 @@
+---
+title: "Humana Competition Modeling Scripts"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+library(caret)
+library(ranger)
+library(pROC)
+library(xgboost)
+library(keras)
+library(tfruns)
+library(mice)
+```
+
+# Data pre-processing
+
+## data cleaning
+add Xingran's part here
+
+* '../training_new.csv' is the cleaned version of dataset
+
+## categorical data processing
+
+```{r}
+######### data input
+new = fread('../training_new.csv') %>% 
+  janitor::clean_names() %>% 
+  as.data.frame()
+# new_cat = new[,..col_cat]
+new = new[,-c(1,2)]
+
+heading = read_excel('../Humana_Mays_2022_DataDictionary.xlsx', sheet = 'Data Dictionary')
+heading = heading %>% janitor::clean_names()
+
+######### change categorical data type to factor
+## idnex for categorical variable (string + some integer index)
+col_cat = heading[which(heading$data_type=='string'),]$feature_name
+int_idx = c("cms_disabled_ind", "cons_hxmioc", "cons_hxmboh", "cons_stlnindx", "cmsd2_men_mad_ind", "cms_dual_eligible_ind", "cons_stlindex", "cms_low_income_ind", "cons_hxmh", "cms_frailty_ind")
+
+cat_idx = c(col_cat, int_idx)
+
+#### ??????? ##########
+new = new %>% 
+  mutate_at(cat_idx, as.factor) %>% 
+  dplyr::select(-all_of(c("cms_institutional_ind", "cms_hospice_ind", "cms_ma_plan_ind"))) #delete cat variables with only one level
+
+# num_idx = names(new)[sapply(new,is.numeric)]
+
+## summary
+# summary(new,maxsum = 15)
+
+#final$cat_idx = cat_idx
+
+```
+
+`new` is the cleaned dataset
+
+## numeric data selection
+Jing's part
+
+```{r}
+data_num <- new[ ,unlist(lapply(new, is.numeric))]
+column_limit_na = names(which(colSums(is.na(data_num)) < 10000))
+data_have_limit_na = data_num[,column_limit_na]
+
+data_num2 = data_have_limit_na %>% 
+  select(hi_flag,everything())
+```
+
+```{r}
+rec1 = recipe(hi_flag ~ ., data = data_num2) %>%
+  # step_impute_knn(all_predictors()) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) %>% 
+  step_nzv(all_predictors()) 
+#%>%
+#  step_pca(all_predictors(), threshold = .95) 
+
+prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_predictors()) %>% 
+  ncol()
+
+select_features = prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_outcomes(),all_predictors())
+
+process_select_vec = sort(colnames(select_features))
+```
+
+* `select_features` is the dataset of selected numeric features
+
+## data imputation
+
+```{r}
+cat = new[ ,unlist(lapply(new, is.factor))]
+all_selected = cbind(select_features,cat) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+
+### 1. Hot deck pmm imputation
+
+impute = function(all_selected, cat_idx){
+  start = Sys.time()
+  print(start)
+  pmm = mice(all_selected, m = 5, method = "pmm")
+  new_all = complete(pmm,"repeated",include = TRUE)
+  ### get the mode of repeated imputations
+  
+  new_imp = data.frame(matrix(ncol = 0, nrow = nrow(new_all)))
+  for ( col in colnames(all_selected) ){
+    subset = new_all %>% select(starts_with(paste0(col,'.')))
+    new_imp[,col] = apply(subset, 1, function(x){
+      if ( is.na(x[1]) ){
+        if ( is.character(x[2]) | is.logical(x[2]))
+          return( names(which.max(table(x[-1]))) ) ## the mode result in repeated pmm
+        else if (is.integer(x[2]))
+          return( median(x[-1]))
+        else if (is.numeric(x[2]))
+          return(mean(x[-1]))
+        else {
+          print(paste0('check the column ',col, ' datatype: ', typeof(x[2])) )
+          return(x[1])
+        }
+      } else return(x[1])
+    })
+  }
+  new_imp = new_imp %>%
+    mutate_at(cat_idx,as.factor)
+
+  print(Sys.time() - start)
+  return(new_imp)
+}
+
+new_imp = impute(all_selected,cat_idx)
+
+save(new_imp,file = "full_imputed.Rdata")
+# load("full_imputed.Rdata")
+```
+
+* `new_imp` is the imputed dataset of all variables selected, variable saved in "full_imputed.Rdata"
+
+## Feature selection
+Jing's second part here
+
+```{r}
+new_imp$hi_flag = as.factor(new_imp$hi_flag)
+levels(new_imp$hi_flag) = c("no","yes")
+# check na
+# a = new_imp%>% 
+#   summarise_all(funs(sum(is.na(.))))
+
+# impute by median
+new_imp <- new_imp %>% mutate(across(cnt_cp_vat_1, ~replace_na(., median(., na.rm=TRUE))))
+```
+
+
+```{r}
+rfRFE <-  list(summary = defaultSummary,
+               fit = function(x, y, first, last, ...){
+                 library(randomForest)
+                 randomForest(x, y, importance = first, ...)
+                 },
+               pred = function(object, x)  predict(object, x),
+               rank = function(object, x, y) {
+                 vimp <- varImp(object)
+                 vimp <- vimp[order(vimp$Overall,decreasing = TRUE),,drop = FALSE]
+                 vimp$var <- rownames(vimp)                  
+                 vimp
+                 },
+               selectSize = pickSizeBest,
+               selectVar = pickVars)
+
+
+ctrl <- rfeControl(functions = rfRFE, # random forest
+                      method = "repeatedcv", # repeated cv
+                      repeats = 1, # number of repeats
+                      number = 10,
+                   returnResamp = "all") # number of folds
+
+library(doMC)
+registerDoMC(cores = 2)
+```
+
+```{r}
+start = Sys.time()
+
+set.seed(10)
+result_rfe1 <- rfe(x=new_imp[,2:237],y = new_imp$hi_flag, sizes = seq(100,230,10), rfeControl = ctrl)
+
+
+# Print the results
+result_rfe1
+
+Sys.time() - start
+
+```
+
+```{r}
+library(doMC)
+registerDoMC(cores = 2)
+
+set.seed(10)
+result_rfe1 <- rfe(x=select_features[,3:199],y = select_features$id, sizes = seq(100,150,50), rfeControl = ctrl)
+
+
+# Print the results
+result_rfe1
+
+# Print the selected features
+predictors(result_rfe1)
+
+trellis.par.set(caretTheme())
+plot(result_rfe1, type = c("g", "o"))
+
+# Print the results visually
+
+```
+
+## Feature Engineering
+
+```{r}
+load("full_imputed.Rdata")
+### create metro column, 1 = metro counties, 0 = non-metro counties
+new_imp_metro = new_imp %>% 
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) )
+```
+
+* cat_metro - cat22 dataset with metro column
+
+ 
+
+# Fairness problem (dataset manipulation)
+Jing and Xingran
+
+# Data Splitting
+Tips: scale and regularization before training
+
+```{r}
+final = new_imp_metro %>% 
+  dplyr::select(-all_of(c("cms_institutional_ind", "cms_hospice_ind", "cms_ma_plan_ind")))
+summary(final[,cat_idx],maxsum = 10)
+
+set.seed(1)
+rowTrain <- createDataPartition(y = final$hi_flag,
+                                p = 0.7,
+                                list = FALSE)
+
+x = final[rowTrain,-1]  ## training data
+y = final$hi_flag[rowTrain]   
+x2 = final[-rowTrain,-1]   ## testing data
+y2 = final$hi_flag[-rowTrain]
+
+save(final,rowTrain,cat_idx,file = "final.Rdata")
+load("final.Rdata")
+```
+
+# Imbalanced Data Processing
+
+### Analysis of Original Dataset
+```{r}
+table(final$hi_flag) # 0: 46182, 1: 2118
+prop.table(table(final$hi_flag))  # 0: 0.956, 1: 0.04
+
+predictor_variables <- final[-1]
+response_variable <- final$hi_flag
+
+library(ROSE)
+library(rpart)
+
+# Original prediction accuracy using decision tree algorithm
+treeimb <- rpart(hi_flag ~ ., data = cbind(x, hi_flag = y))
+pred_treeimb <- predict(treeimb, newdata = cbind(x2, hi_flag = y2))
+
+accuracy.meas(response = y2, predicted = pred_treeimb[,1])
+# F = 0.042 is low and suggests weak accuracy of this model
+
+roc.curve(y2, pred_treeimb[,2], plotit = F) 
+# AUC = 0.5 is a low score, suggesting the poor performance of the model with original data set.
+```
+
+### Data Balancing Models
+```{r}
+# Over sampling
+set.seed(3)
+data_balanced_over <- ovun.sample(hi_flag ~ ., 
+                                  data = cbind(x, hi_flag = y),
+                                  method = "over",
+                                  p = 0.5)$data
+
+table(data_balanced_over$hi_flag)  # 0: 32328 1: 32248
+
+# Under sampling
+set.seed(3)
+data_balanced_under <- ovun.sample(hi_flag ~ ., 
+                                  data = cbind(x, hi_flag = y),
+                                  method = "under",
+                                  p = 0.5)$data
+
+table(data_balanced_under$hi_flag) # 0: 1536 1: 1483
+
+# Both over and under sampling
+set.seed(3)
+data_balanced_both <- ovun.sample(hi_flag ~ ., 
+                                  data = cbind(x, hi_flag = y),
+                                  method = "both",
+                                  p = 0.5)$data
+
+table(data_balanced_both$hi_flag) # 0: 16920 1: 16891
+
+# Data balancing using ROSE
+set.seed(3)
+data_rose <- ROSE(hi_flag ~ ., 
+                  data = cbind(x, hi_flag = y), 
+                  seed = 1)$data
+
+table(data_rose$hi_flag)   # 0: 17000 1: 16811
+```
+
+### Compute Models using Each Data and Evaluate its Accuracy
+```{r}
+#build decision tree models
+tree_rose <- rpart(hi_flag ~ ., data = data_rose)
+tree_over <- rpart(hi_flag ~ ., data = data_balanced_over)
+tree_under <- rpart(hi_flag ~ ., data = data_balanced_under)
+tree_both <- rpart(hi_flag ~ ., data = data_balanced_both)
+
+#make predictions on unseen data
+pred_tree_rose <- predict(tree_rose, newdata = cbind(x2, hi_flag = y2))
+pred_tree_over <- predict(tree_over, newdata = cbind(x2, hi_flag = y2))
+pred_tree_under <- predict(tree_under, newdata = cbind(x2, hi_flag = y2))
+pred_tree_both <- predict(tree_both, newdata = cbind(x2, hi_flag = y2))
+
+# ROC ROSE
+roc.curve(y2, pred_tree_rose[,2])
+# ROC: 0.648
+
+# ROC oversampling
+roc.curve(y2, pred_tree_over[,2])
+# ROC: 0.641
+
+# ROC undersampling
+roc.curve(y2, pred_tree_under[,2])
+# ROC: 0.656
+
+# ROC both
+roc.curve(y2, pred_tree_both[,2])
+# ROC: 0.643
+
+save(data_rose, file = "balanced_data.Rdata")
+
+# load("balanced_data.Rdata")
+```
+
+* We choose ROSE as our method of data balancing
+* Final balanced dataset: data_rose
+
+
+
+# Final Balanced Data Set
+```{r}
+# load("balanced_data.Rdata") ## for balanced train data: data_rose
+load("final.Rdata") ## for original full dataset: final 
+cat_idx2 = c(cat_idx, 'metro')
+
+## training data
+# train = data_rose ##for balanced data
+train = final[rowTrain,] ##for original data
+x = train[,-1]  
+y = train$hi_flag  
+
+## testing data
+test = final[-rowTrain,]
+x2 = final[-rowTrain,-1]   
+y2 = final$hi_flag[-rowTrain]
+
+```
+
+
+
+```{r}
+final$hi_flag = as.factor(final$hi_flag)
+cor(final)
+
+```
+
+# Model selection
+
+## Linear Regression 
+
+```{r}
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+# Fit logistic regression model
+lm.fit <- lm(hi_flag ~ ., 
+         data = train,
+         metric = "ROC")
+
+# Evaluate lm performance on test data
+test.pred.prob <- predict(lm.fit, 
+                         newdata = test,
+                         type = "response")
+
+test.pred <- rep("0", length(test.pred.prob))
+test.pred[test.pred.prob > 0.5] <- "1"
+
+confusionMatrix(data = factor(test.pred),
+                reference = as.factor(final$hi_flag)[-rowTrain],
+                positive = "1")
+
+roc_lm <- roc(y2, test.pred.prob) ## 0.7608
+```
+
+## Logistic regression (baseline)
+
+```{r}
+##data input and initialize setting
+train_rf = train %>% 
+  mutate(hi_flag = as.factor(hi_flag) ) %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+test_rf = test %>% 
+  mutate(hi_flag = as.factor(hi_flag) ) %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+```
+
+```{r}
+model.glm <- train(hi_flag ~ .,
+                data = train_rf,
+                method = "glm",
+                family= "binomial",
+                metric = "ROC",
+                trControl = ctrl)
+model.glm$results$ROC # 0.7353115
+
+glm.pred <- predict(model.glm, newdata = test_rf, type = "prob")[,2]
+roc(y2, glm.pred)
+
+```
+
+roc = 0.7246
+
+## SVM
+
+```{r}
+# SVM with Linear Kernal
+# ctrl1 <- trainControl(method = "cv")
+set.seed(1)
+svml.fit <- train(hi_flag ~ . , 
+                  data = train_rf, 
+                  method = "svmLinear",
+                  metric = "ROC",
+                  # preProcess = c("center", "scale"),
+                  tuneGrid = data.frame(C = exp(seq(-5,2,len=50))),
+                  trControl = ctrl)
+
+plot(svml.fit, highlight = TRUE, xTrans = log)
+svml.fit$bestTune
+
+## test data prediction
+svml.pred <- predict(svml.fit, newdata = test_rf, type = "prob")[,2]
+roc(y2, glmn.pred)
+
+save(svml.pred, file = "tmp_svml.Rdata")
+```
+
+
+## glmnet
+
+```{r}
+glmnGrid <- expand.grid(.alpha = seq(0, 0.2, length = 21),
+                        .lambda = exp(seq(-8, -2, length = 50)))
+
+model.glmn <- train(hi_flag ~ .,
+                    data = train_rf,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+
+model.glmn$bestTune
+max(model.glmn$results$ROC)
+
+myCol<- rainbow(25)
+myPar <- list(superpose.symbol = list(col = myCol),
+              superpose.line = list(col = myCol))
+
+plot(model.glmn, par.settings = myPar, xTrans = function(x) log(x))
+
+## test data prediction
+glmn.pred <- predict(model.glmn, newdata = test_rf, type = "prob")[,2]
+roc(y2, glmn.pred)
+```
+
+roc = 0.7312
+
+## Random Forest
+
+```{r}
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+rf.grid <- expand.grid(mtry = 1:8,
+                       splitrule = "gini",
+                       min.node.size = seq(from = 2, to = 10,
+                                           by = 2))
+
+train_rf = final[rowTrain,] %>% 
+  mutate(hi_flag = as.factor(hi_flag) ) %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+
+test = final[-rowTrain,]
+test_rf = test %>% 
+  mutate(hi_flag = as.factor(hi_flag) ) %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+
+rf.fit <- caret::train(hi_flag ~ .,
+                data = train_rf,
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "ROC",
+                trControl = ctrl)
+
+#validation ROC: 0.7278
+
+save(rf.fit, file = "rf_fit2.Rdata")
+
+rf.pred <- predict(rf.fit, newdata = test_rf, type = "prob")[,2]
+roc.rf <- roc(y2, rf.pred)
+
+ggplot(rf.fit, highlight = TRUE)
+```
+
+```{r}
+# variable importance
+rf2.final.per <- ranger(hi_flag ~ . ,
+                train_rf,
+                mtry = rf.fit$bestTune[[1]],
+                min.node.size = rf.fit$bestTune[[3]],
+                splitrule = "gini",
+                importance = "permutation",
+                scale.permutation.importance = TRUE)
+
+par(mar = c(3,12,3,3))
+barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE)[1:20],
+        las = 2, horiz = TRUE, cex.names = 0.7, 
+        col = colorRampPalette(colors = c("cyan","blue"))(10))
+```
+
+```{r}
+## test
+# rf.pred <- predict(rf.fit, newdata = data[-rowTrain,], type = "raw")
+rf.pred <- predict(rf.fit, newdata = test_rf, type = "prob")[,2]
+roc.rf <- roc(y2, rf.pred)
+```
+
+roc = 0.7061
+
+## LightGBM
+
+```{r}
+library(lightgbm)
+library(MLmetrics)
+
+## data input
+
+# # Convert final data set to matrix
+# train_matrix = model.matrix(hi_flag ~., train)[ , -1]
+# train_y = train$hi_flag
+# test_matrix = model.matrix(hi_flag ~., test)[ , -1]
+# test_y = test$hi_flag
+# 
+# ## get categorical feature list
+# col = colnames(train_matrix)
+# select_list = sapply(cat_idx,grepl,col)
+# cat_idx_matrix = col[apply(select_list,1,any)]
+# 
+# ## generate lgb dataset
+# lgb_train = lgb.Dataset(data=train_matrix,
+#                         label=train_y,
+#                         categorical_feature = cat_idx_matrix)
+# lgb_test = lgb.Dataset(data=test_matrix,
+#                        label=test_y,
+#                        categorical_feature = cat_idx_matrix)
+
+train_lgb = train %>%
+  mutate(hi_flag = as.numeric(hi_flag)) %>%
+  mutate_if(is.factor, as.numeric) %>%
+  as.matrix()
+test_lgb = test %>%
+  mutate(hi_flag = as.numeric(hi_flag)) %>%
+  mutate_if(is.factor, as.numeric) %>%
+  as.matrix()
+
+colnames(train_lgb)
+lgb_train = lgb.Dataset(data=train_lgb[,-1],
+                        label=train_lgb[,1],
+                        categorical_feature = cat_idx2)
+
+colnames(test_lgb)
+x2_lgb = test_lgb[,-1]
+y2_lgb = test_lgb[,1]
+lgb_test = lgb.Dataset(data=x2_lgb,
+                       label=y2_lgb,
+                       categorical_feature = cat_idx2)
+```
+
+### default settings
+
+  comb best_iter best_score max_depth feature_fraction lambda_l1
+1  162      1727   0.756042         2              0.3         6
+  lambda_l2 bagging_fraction
+1       0.3              0.7
+
+
+
+```{r}
+lgb.grid = list(objective = "binary",
+                metric = "auc",
+                max_depth = 2,
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = 0.3,
+                bagging_fraction = 0.7,
+                bagging_freq = 5,
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = 6,
+                lambda_l2 = 0.3,
+                min_data_in_bin=100,
+                min_gain_to_split = 10,
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+
+# Evaluation: Gini for Lgb
+lgb.normalizedgini = function(preds, dtrain){
+  actual = lightgbm::getinfo(dtrain, "label")
+  score  = NormalizedGini(preds,actual)
+  return(list(name = "gini", value = score, higher_better = TRUE))
+}
+```
+
+```{r}
+start = Sys.time()
+start
+
+set.seed(1000)
+lgb.model.cv = lgb.cv(params = lgb.grid, data = lgb_train, learning_rate = 0.01, num_leaves = 25,
+                  num_threads = 4 , nrounds = 3000, early_stopping_rounds = 50,
+                  eval_freq = 20, eval = lgb.normalizedgini,
+                  categorical_feature = cat_idx2, nfold = 5, stratified = TRUE)
+
+best.iter = lgb.model.cv$best_iter
+lgb.model.cv$best_score
+
+Sys.time() - start
+```
+
+```{r}
+set.seed(1)
+lgb.model = lgb.train(params = lgb.grid, data = lgb_train, learning_rate = 0.01, 
+                      num_leaves = 25,num_threads = 2 , nrounds = 1727,#best.iter,
+                      eval_freq = 20, eval = lgb.normalizedgini,
+                      categorical_feature = cat_idx2)
+
+lgb_pred = predict(lgb.model,x2_lgb)
+roc(y2_lgb, lgb_pred)
+```
+
+for not dummy variable: roc = 0.7014
+for dummy variable: roc = 0.6962
+
+### Grid Tuning
+
+```{r}
+grids = expand.grid(max_depth = c(1,2,3),
+                # learning_rate = c(0.01,0.005),
+                # min_sum_hessian_in_leaf = seq(0,1,0.1),  #seq(0.0005,0.01,0.002),
+                feature_fraction = c(0.1,0.2,0.3),
+                lambda_l1 = c(2.5,4.5,6.5),
+                lambda_l2 = c(0.3,0.5,0.8),
+                # min_gain_to_split = 10,  #seq(1,15,4),
+                # min_data_in_leaf = c(30,100,500,1000,2000)
+                bagging_fraction = c(0.7, 0.8,0.9,1)
+                # bagging_freq = c(5,10)
+                # min_data = 100,
+                # max_bin = 50,
+                # min_data_in_bin=100
+                )
+
+start = Sys.time()
+start
+
+performance = data.frame(matrix(ncol = 3, nrow = 0))
+colnames(performance) = c('comb','best_iter', "best_score")
+for (i in c(1:nrow(grids))){
+  lgb.grid = list(objective = "binary",
+                metric = "auc",
+                max_depth = grids$max_depth[i],
+                learning_rate = 0.01, #grids$learning_rate[i],
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = grids$feature_fraction[i],
+                bagging_fraction =  grids$bagging_fraction[i],
+                bagging_freq =  5, #grids$bagging_freq[i],
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = grids$lambda_l1[i],
+                lambda_l2 = grids$lambda_l2[i],
+                min_data_in_bin=100,
+                min_gain_to_split = 10, #grids$min_gain_to_split[i],
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+                # scale_pos_weight = 24)
+  
+  set.seed(256)
+  lgb.model.cv = lgb.cv(params = lgb.grid, data = lgb_train, num_leaves = 25,
+                  num_threads = 4 , nrounds = 3000, early_stopping_rounds = 50,
+                  eval_freq = 20, eval = lgb.normalizedgini,
+                  categorical_feature = cat_idx2, nfold = 5, stratified = TRUE)
+  record = data.frame(comb=i, 
+                      best_iter=lgb.model.cv$best_iter, 
+                      best_score=lgb.model.cv$best_score)
+  print(record)
+  performance = rbind(performance,record)
+}
+
+best = performance[which.max(performance$best_score),]
+print(best)
+
+p2 = cbind(performance, grids) %>%
+  arrange(desc(best_score))
+
+print(p2[1,])
+
+Sys.time() - start
+
+## round 1 best
+# comb best_iter best_score max_depth feature_fraction lambda_l1 lambda_l2
+# 1   83      1199  0.7584805         2              0.2         4       0.5
+```
+
+  comb best_iter best_score max_depth feature_fraction lambda_l1 lambda_l2 bagging_fraction
+1  172      2479  0.7535647         1              0.1       4.5       0.3              0.9
+
+```{r}
+# Train final model
+# i = best$comb
+lgb.grid = list(objective = "binary",
+                metric = "auc",
+                max_depth = p2$max_depth[1],
+                learning_rate = 0.01, #p2$learning_rate[1],
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = p2$feature_fraction[1],
+                bagging_fraction = p2$bagging_fraction[1],
+                bagging_freq = 5, # p2$bagging_freq[1],
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = 4, #p2$lambda_l1[1],
+                lambda_l2 = p2$lambda_l2[1],
+                min_data_in_bin=100,
+                min_gain_to_split = 10, #grids$min_gain_to_split[i],
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+                # scale_pos_weight = 24)
+
+lgb.model = lgb.train(params = lgb.grid, data = lgb_train, num_leaves = 25,
+                      num_threads = 4 , nrounds = p2$best_iter[1],
+                      eval_freq = 20, eval = lgb.normalizedgini,
+                      categorical_feature = cat_idx2)
+
+lgb_pred = predict(lgb.model,x2_lgb)
+roc(y2_lgb, lgb_pred)
+
+save(p2, lgb.model, file= "tmp_best.Rdata")
+```
+
+ROC = 0.7341
+
+## XGBoost
+
+### Jiaqi's
+
+```{r}
+# Convert final data set to matrix
+final_matrix = model.matrix(hi_flag ~., final)[ , -1]
+
+# training data
+train_data <- final_matrix[rowTrain,]
+train_labels <- final$hi_flag[rowTrain]
+
+# testing data
+test_data <- final_matrix[-rowTrain,]
+test_labels <- final$hi_flag[-rowTrain]
+
+save(final_matrix,train_data, train_labels, test_data, test_labels, rowTrain, file = "split_data_matrix.Rdata")
+
+# Load XGBoost package
+library(xgboost)
+
+# Convert the cleaned dataframe to a matrix
+dtrain <- xgb.DMatrix(data = train_data, label = train_labels)
+dtest <- xgb.DMatrix(data = test_data, label = test_labels)
+```
+
+### Model Training
+```{r}
+# train a model using our training data
+set.seed(1)
+xgboost_model <- xgboost(data = dtrain,   
+                 nround = 2, 
+                 objective = "binary:logistic")  
+
+### [1]	train-logloss:0.478371 
+### [2]	train-logloss:0.360748 
+
+# generate predictions for our held-out testing data
+pred <- predict(xgboost_model, dtest)
+
+# get & print the classification error
+err <- mean(as.numeric(pred > 0.5) != test_labels)
+print(paste("test-error=", err))
+
+### test-error= 0.0420289855072464
+
+# ROC
+roc_xgboost <- roc(test_labels, pred) ## 0.7862
+```
+
+### Model Turning 
+```{r}
+# train an xgboost model
+set.seed(1)
+model_tuned <- xgboost(data = dtrain,       
+                 max.depth = 3, 
+                 nround = 2, 
+                 objective = "binary:logistic") 
+
+### [1]	train-logloss:0.479854 
+### [2]	train-logloss:0.363968 
+
+# generate predictions for our held-out testing data
+pred2 <- predict(model_tuned, dtest)
+
+# get & print the classification error
+err2 <- mean(as.numeric(pred2 > 0.5) != test_labels)
+print(paste("test-error=", err2))
+
+### test-error = 0.0420289855072464
+
+# ROC
+roc_xgboost2 <- roc(test_labels, pred2) ## 0.7369
+```
+
+### Paramer Tuning
+```{r}
+# get the number of negative & positive cases in our data
+negative_cases <- sum(train_labels == 0) ## 0 = FALSE
+postive_cases <- sum(train_labels == 1) ##1 = TRUE
+
+# train a model using our training data
+set.seed(1)
+model_tuned2 <- xgboost(data = dtrain,           
+                 max.depth = 3, 
+                 nround = 10, 
+                 early_stopping_rounds = 3, 
+                 objective = "binary:logistic",
+                 scale_pos_weight = negative_cases/postive_cases,
+                 gamma = 1) 
+
+# generate predictions for our held-out testing data
+pred3 <- predict(model_tuned2, dtest)
+
+# get & print the classification error
+err3 <- mean(as.numeric(pred3 > 0.5) != test_labels)
+print(paste("test-error=", err3))
+
+### test-error = 0.237405106970324
+
+# ROC
+roc_xgboost3 <- roc(test_labels, pred3) ## 0.8448
+```
+
+
+```{r}
+final2 = final
+library(mlr)
+```
+
+
+```{r}
+#x = train[,-1]  ## training data
+#y = train$hi_flag   
+#x2 = final[-rowTrain,-1]   ## testing data
+#y2 = final$hi_flag[-rowTrain]
+
+
+
+
+final2 = final
+final2 = final2 %>% 
+  mutate_if(is.factor,as.numeric) 
+
+library(mlr)
+
+trainTask <- makeClassifTask(data = final2[rowTrain,], target = "hi_flag", positive = 1)
+testTask <- makeClassifTask(data = final2[-rowTrain,], target = "hi_flag")
+
+
+set.seed(1)
+# Create an xgboost learner that is classification based and outputs
+# labels (as opposed to probabilities)
+xgb_learner <- makeLearner(
+  "classif.xgboost",
+  predict.type = "prob",
+  par.vals = list(
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 200
+  )
+)
+
+xgb_model <- mlr::train(xgb_learner, task = trainTask)
+```
+
+
+
+```{r}
+
+xgb_params <- makeParamSet(
+  # The number of trees in the model (each one built sequentially)
+  makeIntegerParam("nrounds", lower = 50, upper = 300),
+  # number of splits in each tree
+  makeIntegerParam("max_depth", lower = 1, upper = 30),
+  # "shrinkage" - prevents overfitting
+  makeNumericParam("eta", lower = .01, upper = .4),
+  # L2 regularization - prevents overfitting
+  makeNumericParam("lambda", lower = -1, upper = 0, trafo = function(x) 10^x)
+)
+
+
+getParamSet("classif.xgboost")
+
+control <- makeTuneControlRandom(maxit = 1)
+
+set.seed(1)
+resample_desc <- makeResampleDesc("CV", iters = 5)
+tuned_params <- tuneParams(
+  learner = xgb_learner,
+  task = trainTask,
+  resampling = resample_desc,
+  par.set = xgb_params,
+  control = control
+)
+
+# Result: nrounds=240; max_depth=3; eta=0.287; lambda=0.586 : mmce.test.mean=0.0452811
+# 0.7025
+
+# Result: nrounds=272; max_depth=1; eta=0.337; lambda=0.214 : mmce.test.mean=0.0438911
+# 0.737
+
+#balanced
+#[Tune] Result: nrounds=268; max_depth=4; eta=0.125; lambda=0.105 : mmce.test.mean=0.1142048
+# 0.9577
+
+# Result: nrounds=177; max_depth=10; eta=0.308; lambda=0.436 : mmce.test.mean=0.1156836
+
+#seed.1 [Tune] Result: nrounds=244; max_depth=3; eta=0.0639; lambda=0.206 : mmce.test.mean=0.1446276
+# 0.9537
+```
+
+
+```{r}
+# Create a new model using tuned hyperparameters
+xgb_tuned_learner <- setHyperPars(
+  learner = xgb_learner,
+  par.vals = tuned_params$x
+)
+
+# Re-train parameters using tuned hyperparameters (and full training set)
+xgb_model <- mlr::train(xgb_tuned_learner, trainTask)
+
+pred3 <- predict(xgb_model, testTask, type="prob")
+
+pred3$data$response
+
+roc_xgboost3 <- roc(pred3$data$truth, pred3$data$prob.1) ## 0.7268
+roc_xgboost3
+
+```
+variable importance
+```{r}
+
+#getFeatureImportance(xgb_model)
+
+vm = generateFeatureImportanceData(
+  trainTask,
+  method = "permutation.importance",
+  xgb_tuned_learner,
+  features = getTaskFeatureNames(trainTask)
+)
+
+
+k = vm$res 
+
+imp =  k%>%
+  pivot_longer(cols = everything(),names_to ="var") %>% 
+  arrange(desc(value)) %>% 
+  pull(value)
+
+names(imp) = k%>%
+  pivot_longer(cols = everything(),names_to ="var") %>% 
+  arrange(desc(value)) %>% 
+  pull(var)
+
+par(mar = c(3,12,3,3))
+barplot(imp[1:20],
+        las = 2, horiz = TRUE, cex.names = 0.7, 
+        col = colorRampPalette(colors = c("cyan","blue"))(10))
+
+```
+roc
+
+```{r}
+df = generateThreshVsPerfData(pred3, measures = list(fpr, tpr, mmce))
+plotROCCurves(df)
+```
+
+```{r}
+plotThreshVsPerf(df)
+```
+
+pdps
+```{r}
+library(vip)
+library(pdp)
+library(lime)
+library(mmpf)
+```
+
+```{r}
+# partial dependence plot
+mod <- getLearnerModel(xgb_model)  # EXTRACT THE MODEL!!  <<--
+partial(mod, pred.var = "dcsi_score", prob = TRUE, 
+        plot = TRUE, train = train2)
+```
+
+```{r}
+lrn = makeLearner("regr.svm")
+fit = train(lrn, bh.task)
+pd = generatePartialDependenceData(fit, bh.task, "lstat")
+plotPartialDependence(pd, data = getTaskData(bh.task))
+xgb_model <- mlr::train(xgb_learner, task = trainTask)
+
+```
+
+```{r}
+pd = generatePartialDependenceData(xgb_model,trainTask)
+plotPartialDependence(pd, data = getTaskData(bh.task))
+```
+
+
+```{r}
+pdp = generatePartialDependenceData(xgb_model,trainTask,"rx_overall_pmpm_cost")
+plotPartialDependence(pdp, data = getTaskData(trainTask))
+```
+
+
+### Model Examining
+```{r}
+library(base)
+library(DiagrammeR)
+# Plot fratures
+xgb.plot.multi.trees(feature_names = names(final_matrix),
+                     model = xgboost_model)
+
+# Get information on how important each feature is
+importance_matrix <- xgb.importance(names(final_matrix), model = xgboost_model)
+
+# Important plot 
+xgb.plot.importance(importance_matrix)
+```
+
+
+
+## Neural Networks
+
+```{r}
+load("split_data_matrix.Rdata")
+## tuning
+runs <- tuning_run("keras_grid_search.R", 
+                   flags = list(
+                   nodes_layer1 = c(64, 128, 256),
+                   nodes_layer2 = c(64, 128, 256),
+                   nodes_layer3 = c(64, 128, 256),
+                   dropout_layer1 = c(0.3, 0.4,0.5),
+                   dropout_layer2 = c(0.3, 0.4,0.5),
+                   dropout_layer3 = c(0.3, 0.4,0.5)),
+                   confirm = FALSE,
+                   echo = FALSE,
+                   sample = 0.1) # try more after class
+
+best = runs[which.max(runs$metric_auc),]
+best
+max(runs$metric_val_auc)
+```
+
+```{r}
+train_labels_cat <- to_categorical(train_labels, 2)
+test_labels_cat <- to_categorical(test_labels, 2)
+
+model.nn <- keras_model_sequential() %>%
+  layer_dense(units = best$flag_nodes_layer1, activation = "relu", input_shape = ncol(train_data)) %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer1) %>%
+  layer_dense(units = best$flag_nodes_layer2, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer2) %>%
+  layer_dense(units = best$flag_nodes_layer3, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = best$flag_dropout_layer3) %>%
+  layer_dense(units = 2, activation = "sigmoid") %>%
+  compile(loss = "binary_crossentropy",
+          optimizer = optimizer_adam(), 
+          metrics = "AUC") 
+fit.nn = model.nn %>% 
+  fit(x = train_data, 
+      y = train_labels_cat, 
+      epochs = 50, 
+      batch_size = 256,
+      validation_split = 0.2,
+      class_weight = list('0'=1,'1'=22),
+      callbacks = list(callback_early_stopping(patience = 10),
+                       callback_reduce_lr_on_plateau()),
+      verbose = 2)
+plot(fit.nn)
+
+## testing and evaluation
+score <- model.nn %>% evaluate(test_data, test_labels_cat)
+nn_pred = predict(model.nn, test_data)[,2]
+roc(test_labels, nn_pred)
+```
+
+ROC = 0.677
+
+# Model Evaluation
+
+# Result submission
+
+```{r}
+# holdout data manipulation
+all_feature = colnames(select(final,-hi_flag))
+cat_idx2 = c(cat_idx,"metro")
+num_idx = setdiff(all_feature,cat_idx2)
+
+## feature selection
+holdout = read.csv("../2022_Competition_Holdout.csv") %>% 
+  janitor::clean_names()
+holdout[holdout=='null'] = NA
+holdout_id = holdout$id
+
+holdout = holdout %>% 
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) ) %>% 
+  select_at(all_feature) %>%
+  mutate_at(cat_idx2, as.factor) %>% 
+  mutate_at(num_idx,as.numeric)
+### view the NA condition
+h.na = sapply(holdout,function(x) sum(is.na(x)))
+h.na[which(h.na>0)]
+
+# ## imputation
+# train_holdout = rbind(cbind(select(final,-hi_flag,-metro),dataset = "train"),
+#                       cbind(holdout,dataset = "test"))
+# holdout_imp = impute(train_holdout,cat_idx)
+
+```
+
+
+## Ver1: tunned lightGBM
+updated: to tunned lightGBM
+
+```{r}
+## data input
+train_lgb = final %>%
+  mutate(hi_flag = as.numeric(hi_flag)) %>%
+  mutate_if(is.factor, as.numeric) %>%
+  as.matrix()
+test_lgb = holdout %>%
+  mutate_if(is.factor, as.numeric) %>%
+  as.matrix()
+colnames(train_lgb)
+
+lgb_train = lgb.Dataset(data=train_lgb[,-1],
+                        label=train_lgb[,1],
+                        categorical_feature = cat_idx2)
+```
+
+comb best_iter best_score max_depth feature_fraction lambda_l1 lambda_l2
+1   83      1199  0.7584805         2              0.2         4       0.5
+
+```{r}
+## parameter sets
+lgb.grid = list(objective = "binary",
+                metric = "auc",
+                max_depth = 2,
+                learning_rate = 0.01,
+                min_sum_hessian_in_leaf = 1,
+                feature_fraction = 0.2,
+                bagging_fraction = 0.7, 
+                bagging_freq = 5, 
+                min_data = 100,
+                max_bin = 50,
+                lambda_l1 = 4,
+                lambda_l2 = 0.5,
+                min_data_in_bin=100,
+                min_gain_to_split = 10, 
+                min_data_in_leaf = 30,
+                is_unbalance = TRUE)
+
+# Evaluation: Gini for Lgb
+lgb.normalizedgini = function(preds, dtrain){
+  actual = lightgbm::getinfo(dtrain, "label")
+  score  = NormalizedGini(preds,actual)
+  return(list(name = "gini", value = score, higher_better = TRUE))
+}
+```
+
+```{r}
+start = Sys.time()
+start
+
+lgb.model.cv = lgb.cv(params = lgb.grid, data = lgb_train, learning_rate = 0.01, num_leaves = 25,is_unbalance = TRUE,
+                  num_threads = 4, nrounds = 7000, early_stopping_rounds = 50,
+                  eval_freq = 20, eval = lgb.normalizedgini,
+                  categorical_feature = cat_idx2, nfold = 5, stratified = TRUE)
+
+best.iter = lgb.model.cv$best_iter
+lgb.model.cv$best_score
+
+Sys.time() - start
+```
+
+```{r}
+lgb.model = lgb.train(params = lgb.grid, data = lgb_train, learning_rate = 0.01, 
+                      num_leaves = 25,num_threads = 4 , nrounds = best.iter,
+                      eval_freq = 20, eval = lgb.normalizedgini,
+                      categorical_feature = cat_idx2)
+
+lgb_pred = predict(lgb.model,test_lgb)
+output = cbind(ID = holdout_id, 
+               SCORE = lgb_pred,
+               RANK = rank(-lgb_pred, ties.method = "last"))
+write.csv(output,"2022CaseCompetition_Yiru_Gong_20221005.csv",row.names = F)
+```
+
+
+## Ver 3: GLMNET
+
+!!! data need to be imputed
+
+```{r}
+train_rf = final %>% 
+  mutate(hi_flag = as.factor(hi_flag) ) %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+holdout_rf = holdout %>% 
+  mutate_if(is.factor,function(x) factor(x, labels = make.names(levels(x))))
+
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+```
+
+```{r}
+glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 21),
+                        .lambda = exp(seq(-8, -2, length = 50)))
+
+model.glmn <- caret::train(hi_flag ~ .,
+                    data = train_rf,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+
+model.glmn$bestTune
+
+myCol<- rainbow(25)
+myPar <- list(superpose.symbol = list(col = myCol),
+              superpose.line = list(col = myCol))
+
+plot(model.glmn, par.settings = myPar, xTrans = function(x) log(x))
+
+# save(model.glmn, test_rf, file = "tmp_glmn.Rdata")
+load("tmp_glmn.Rdata")
+## test data prediction
+glmn.pred <- predict(model.glmn, newdata = holdout_rf, type = "prob")[,2]
+```
+
+```{r}
+output = cbind(ID = holdout_id, 
+               SCORE = glmn.pred,
+               RANK = rank(-glmn.pred, ties.method = "last"))
+write.csv(output,"2022CaseCompetition_Yiru_Gong_20221007.csv",row.names = F)
+```
+
+

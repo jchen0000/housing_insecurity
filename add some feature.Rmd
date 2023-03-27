@@ -1,0 +1,76 @@
+---
+title: "deleted variable exploration"
+author: "Yiru Gong, yg2832"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+library(Rtsne)
+library(cluster)
+```
+
+import data:
+* new_full: all data with na < 30000, 868 cols
+* final: final enlarged dataset, 260 cols
+
+```{r}
+load("final_na_enlarged.Rdata")
+unused_idx = setdiff(colnames(new_full),colnames(final))
+unused = new_full[,unused_idx]
+# summary(unused[,1:10])
+write.csv(unused, "unused.csv",row.names = F)
+```
+
+```{r}
+tsne = Rtsne(unused)
+tsne_df = tsne$Y %>% 
+  as.data.frame() %>% 
+  rename(tsne1 = "V1",
+         tsne2 = "V2")
+tsne_df = cbind(tsne_df, hi_flag = final$hi_flag, cat)
+```
+
+```{r}
+pam = pam(unused,10)
+
+
+```
+
+
+```{r}
+heading = read_excel('../Humana_Mays_2022_DataDictionary.xlsx', sheet = 'Data Dictionary')
+# heading = heading %>% janitor::clean_names()
+heading["used"] = sapply(heading$`Feature name`,function(x) ifelse(x %in% colnames(final), "yes","no"))
+
+setdiff(colnames(final),heading$`Feature name`[which(heading$used=='yes')])
+write.csv(heading,"labeled_dictionary.csv",row.names = F)
+```
+
+
+## added manually by Xingran
+
+```{r}
+added = c("atlas_naturalchangerate1016",'atlas_net_international_migration_rate',
+'atlas_snapspth16',
+'cmsd1_ano_pmpm_ct',
+'cmsd1_ext_pmpm_ct',
+'cmsd1_neo_pmpm_ct',
+'cmsd1_pre_pmpm_ct',
+'cmsd1_unc_pmpm_ct',
+'cons_ccip')
+
+added[added %in% colnames(final)]
+added[! added %in% colnames(final)]
+
+load("final.Rdata")
+final_small = final
+load("final_na_enlarged.Rdata")
+final_large = final
+final_manual = cbind(final_small,
+                     final_large[,added[added %in% colnames(final)]],
+                     new_full[,added[! added %in% colnames(final)]])
+save(final_manual, rowTrain, cat_idx, file = "to_xinran.Rdata")
+```
+

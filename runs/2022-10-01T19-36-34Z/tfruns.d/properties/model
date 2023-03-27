@@ -1,0 +1,32 @@
+Model: "sequential"
+________________________________________________________________________________
+ Layer (type)                       Output Shape                    Param #     
+================================================================================
+ dense_3 (Dense)                    (None, 64)                      15040       
+                                                                                
+ batch_normalization_2 (BatchNormal  (None, 64)                     256         
+ ization)                                                                       
+                                                                                
+ dropout_2 (Dropout)                (None, 64)                      0           
+                                                                                
+ dense_2 (Dense)                    (None, 64)                      4160        
+                                                                                
+ batch_normalization_1 (BatchNormal  (None, 64)                     256         
+ ization)                                                                       
+                                                                                
+ dropout_1 (Dropout)                (None, 64)                      0           
+                                                                                
+ dense_1 (Dense)                    (None, 128)                     8320        
+                                                                                
+ batch_normalization (BatchNormaliz  (None, 128)                    512         
+ ation)                                                                         
+                                                                                
+ dropout (Dropout)                  (None, 128)                     0           
+                                                                                
+ dense (Dense)                      (None, 2)                       258         
+                                                                                
+================================================================================
+Total params: 28,802
+Trainable params: 28,290
+Non-trainable params: 512
+________________________________________________________________________________

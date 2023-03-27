@@ -1,0 +1,8 @@
+{
+  "nodes_layer1": 256,
+  "nodes_layer2": 64,
+  "nodes_layer3": 64,
+  "dropout_layer1": 0.4,
+  "dropout_layer2": 0.4,
+  "dropout_layer3": 0.3
+}

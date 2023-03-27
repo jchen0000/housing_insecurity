@@ -1,0 +1,117 @@
+---
+title: "categorical data processing"
+author: "Yiru, Jiaqi"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+```
+
+# Data cleaning
+ddl: 9.23 12:00pm (give cat variable)
+
+```{r}
+data = fread('../2022_Competition_Training.csv')
+heading = read_excel('../Humana_Mays_2022_DataDictionary.xlsx', sheet = 'Data Dictionary')
+heading = heading %>% janitor::clean_names()
+```
+
+## missing data: 
+<80% imputation(knn, bagging, numerical mean)
+fread()
+## quantitive
+
+## categorical
+!!!sparse data (in the quantitive as well)
+
+```{r}
+## integers with binary and index
+int_idx = c("cms_disabled_ind", "cons_hxmioc", "cons_hxmboh", "cons_stlnindx", "cmsd2_men_mad_ind", "cms_institutional_ind", "cms_hospice_ind", "cms_dual_eligible_ind", "cons_stlindex", "cms_low_income_ind", "cms_ma_plan_ind", "cons_hxmh", "cms_frailty_ind")
+
+int_cat = data %>% 
+  select(cms_disabled_ind, cons_hxmioc, cons_hxmboh, cons_stlnindx, cmsd2_men_mad_ind, cms_institutional_ind, cms_hospice_ind, cms_dual_eligible_ind, cons_stlindex, cms_low_income_ind, cms_ma_plan_ind, cons_hxmh, cms_frailty_ind)
+```
+
+```{r}
+## select categorical data with strings
+col_cat = heading[which(heading$data_type=='string'),]$feature_name
+cat = data[,..col_cat] %>% as.data.frame()
+
+cat = cbind(cat,int_cat)
+```
+
+```{r}
+## data cleaning
+cat[cat=='null'] = NA
+cat = cat %>%
+  mutate_all(as.factor)
+
+## summary
+summary(cat,maxsum = 15)
+```
+
+
+```{r}
+## replace missing value with KNN
+start = Sys.time()
+cat2 = kNN(cat)
+# load('knn_cat.Rdata')
+cat22 = cat2 %>% dplyr::select(!ends_with('_imp'))
+summary(cat22)
+Sys.time() - start
+
+### other method in imputation
+### 1. Hot deck pmm
+library(mice)
+
+start = Sys.time()
+cat3 = mice(cat, m = 5, method = "pmm")
+cat3_all = complete(cat3, "repeated",include = TRUE)
+### get the mode of repeated imputations
+
+cat33 = data.frame(matrix(ncol = 0, nrow = nrow(cat3_all)))
+for (col in c(col_cat, int_idx) ){
+  subset = cat3_all %>% select(starts_with(col))
+  cat33[,col] = apply(subset, 1, function(x){
+    if ( is.na(x[1]) ){
+      return( names(which.max(table(x[-1]))) ) ## the mode result in repeated pmm
+    } else return(x[1])
+  })
+}
+cat33 = cat33 %>%
+  mutate_all(as.factor)
+
+Sys.time() - start
+```
+
+```{r}
+### compare pmm and KNN
+library(arsenal)
+summary(comparedf(cat22,cat33))
+```
+
+* `cat22` is the final dataset after KNN imputation of categorical data
+* `cat33` is the final dataset after pmm hot-deck imputation of categorical data
+
+### data manipulation
+
+```{r}
+### create metro column, 1 = metro counties, 0 = non-metro counties
+cat_metro = cat22 %>% 
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0))
+
+# save(cat22,cat33,cat_metro,file='string_result.Rdata')
+```
+
+* cat_metro - cat22 dataset with metro column

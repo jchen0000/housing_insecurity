@@ -1,0 +1,200 @@
+---
+title: "increase variable"
+author: "Yiru Gong, yg2832"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r, warning=FALSE}
+library(data.table)
+library(readxl)
+library(tidyverse)
+library(VIM)
+library(dplyr)
+library(recipes)
+library(caret)
+library(ranger)
+library(pROC)
+library(xgboost)
+library(keras)
+library(tfruns)
+library(mice)
+```
+
+# Data without Imputation
+```{r}
+new = fread('../training_new.csv') %>% 
+  janitor::clean_names() %>% 
+  as.data.frame()
+# new_cat = new[,..col_cat]
+new = new[,-c(1,2)]
+
+heading = read_excel('../Humana_Mays_2022_DataDictionary.xlsx', sheet = 'Data Dictionary')
+heading = heading %>% janitor::clean_names()
+
+######### change categorical data type to factor
+col_cat = heading[which(heading$data_type == 'string'),]$feature_name
+
+int_idx = c("cms_disabled_ind", "cons_hxmioc", "cons_hxmboh", "cons_stlnindx", "cmsd2_men_mad_ind", "cms_dual_eligible_ind", "cons_stlindex", "cms_low_income_ind", "cons_hxmh", "cms_frailty_ind")
+
+cat_idx = c(col_cat, int_idx)
+
+## cat to factor
+new = new %>% 
+  mutate_at(cat_idx, as.factor)
+
+######## remove column with high NA percentage
+# na_view = sort(colSums(is.na(new)), decreasing = T)
+# head(na_view,20)
+column_limit_na = names(which(colSums(is.na(new)) < 30000))
+new_full = new[,column_limit_na]
+
+```
+
+```{r}
+# numeric data selection
+data_num <- new_full[ ,unlist(lapply(new_full, is.numeric))]
+cat = new_full[ ,unlist(lapply(new_full, is.factor))]
+
+# column_limit_na = names(which(colSums(is.na(data_num)) < 10000))
+
+# data_have_limit_na = data_num[,column_limit_na]
+
+data_num2 = data_num %>% 
+  select(hi_flag,everything())
+
+rec1 = recipe(hi_flag ~ ., data = data_num2) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) %>% 
+  step_nzv(all_predictors()) 
+
+prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_predictors()) %>% 
+  ncol()
+
+select_features = prep(rec1, training = data_num2, retain = TRUE) %>% 
+  juice(all_outcomes(),all_predictors())
+
+process_select_vec = sort(colnames(select_features))
+
+
+## binding
+
+all_selected = cbind(select_features,cat) %>% 
+  mutate(hi_flag = as.factor(hi_flag))
+
+```
+
+## imputation
+
+```{r}
+impute = function(all_selected, cat_idx){
+  start = Sys.time()
+  print(start)
+  pmm = mice(all_selected, m = 5, method ="cart") # "pmm")
+  new_all = complete(pmm,"repeated",include = TRUE)
+  ### get the mode of repeated imputations
+  
+  new_imp = data.frame(matrix(ncol = 0, nrow = nrow(new_all)))
+  for ( col in colnames(all_selected) ){
+    subset = new_all %>% select(starts_with(paste0(col,'.')))
+    new_imp[,col] = apply(subset, 1, function(x){
+      if ( is.na(x[1]) ){
+        if ( is.character(x[2]) | is.logical(x[2]))
+          return( names(which.max(table(x[-1]))) ) ## the mode result in repeated pmm
+        else if (is.integer(x[2]))
+          return( median(x[-1]))
+        else if (is.numeric(x[2]))
+          return(mean(x[-1]))
+        else {
+          print(paste0('check the column ',col, ' datatype: ', typeof(x[2])) )
+          return(x[1])
+        }
+      } else return(x[1])
+    })
+  }
+  new_imp = new_imp %>%
+    mutate_at(cat_idx,as.factor)
+
+  print(Sys.time() - start)
+  return(new_imp)
+}
+
+new_imp = impute(all_selected,cat_idx)
+save(new_imp,file = "full_imputed_enlarged.Rdata")
+```
+
+## feature engineering
+
+```{r}
+new_imp_metro = new_imp %>% 
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) )
+```
+
+## dataset split
+
+```{r}
+final = new_imp_metro
+cat_idx2 = final %>% 
+  select_if(is.factor) %>% 
+  select(-hi_flag) %>% 
+  colnames()
+
+set.seed(1)
+rowTrain <- createDataPartition(y = final$hi_flag,
+                                p = 0.7,
+                                list = FALSE)
+
+x = final[rowTrain,-1]  ## training data
+y = final$hi_flag[rowTrain]   
+x2 = final[-rowTrain,-1]   ## testing data
+y2 = final$hi_flag[-rowTrain]
+
+save(final,rowTrain,cat_idx2,file = "final_na_enlarged.Rdata")
+# load("final_na_enlarged.Rdata")
+```
+
+## holdout data imputation
+
+```{r}
+# holdout data manipulation
+all_feature = colnames(select(final,-hi_flag))
+new_feature = c('metro')
+# cat_idx2 = c(cat_idx,"metro")
+num_idx = setdiff(all_feature,cat_idx2)
+
+## feature selection
+holdout = read.csv("../2022_Competition_Holdout.csv") %>% 
+  janitor::clean_names()
+holdout[holdout=='null'] = NA
+holdout_id = holdout$id
+
+holdout = holdout %>% 
+  # mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+  #        metro = as.factor(metro) ) %>% 
+  select_at( setdiff(all_feature, new_feature) ) %>%
+  mutate_at(setdiff(cat_idx2, new_feature), as.factor) %>% 
+  mutate_at(num_idx,as.numeric)
+### view the NA condition
+h.na = sapply(holdout,function(x) sum(is.na(x)))
+h.na[which(h.na>0)]
+
+## imputation
+# train_holdout = rbind(cbind(all_selected[,colnames(holdout)],dataset = "train"),
+#                       cbind(holdout,dataset = "holdout"))
+# ds_index = train_holdout$dataset
+# th = train_holdout %>% select(-dataset) %>% as.data.frame()
+# th_imp = impute(th,cat_idx)
+# train_imp = impute(all_selected[,colnames(holdout)], cat_idx)
+holdout_imp = impute(holdout,cat_idx)
+```
+
+```{r}
+## feature engineering
+holdout_imp_final = holdout_imp %>% 
+  mutate(metro = ifelse(grepl("Metro", rucc_category) , 1, 0),
+         metro = as.factor(metro) )
+save(holdout_imp_final, file = "holdout_imputation.Rdata")
+```
+
